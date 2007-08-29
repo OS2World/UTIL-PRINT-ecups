@@ -1,7 +1,8 @@
 OUTDIR=bin
 PINBIN=bin
 LINK=ilink
-LFLAGS=/NOFREE
+LFLAGS=/NOFREE /NOLOGO
+CC_FLAGS=/Q /Iinclude /Ss /C
 
 PIN_OBJS=obj\afm2pak.obj \
          obj\config.obj \
@@ -14,7 +15,10 @@ PIN_OBJS=obj\afm2pak.obj \
          obj\pinmain.obj \
          obj\ppd2pak.obj
 
-all: $(OUTDIR)\pin.exe
+PPD_OBJS=obj\ppdenc.obj \
+	 obj\listfls.obj
+
+all: $(OUTDIR)\pin.exe $(OUTDIR)\ppdenc.exe
 
 
 
@@ -31,6 +35,19 @@ CODE PRELOAD
 STACKSIZE       32768
 <<KEEP
 
+$(PINBIN)\ppdenc.def: makefile
+	@echo Writing new  @<<$(PINBIN)\ppdenc.def
+NAME PIN WINDOWCOMPAT
+EXETYPE OS2
+PROTMODE
+
+DESCRIPTION
+  'PPD ENCODING CONVERTER TOOL'
+
+CODE PRELOAD
+STACKSIZE       32768
+<<KEEP
+
 # THE EXE
 $(OUTDIR)\pin.exe: makefile $(PIN_OBJS) $(PINBIN)\pin.def
        $(LINK) $(LFLAGS) $(LDFLAGS) @<<$(PINBIN)\pin.lnk
@@ -42,3 +59,16 @@ $(OUTDIR)\pin.exe: makefile $(PIN_OBJS) $(PINBIN)\pin.def
        $(PINBIN)\pin.def;
 <<keep
 
+$(OUTDIR)\ppdenc.exe: makefile $(PPD_OBJS) $(PINBIN)\ppdenc.def
+	$(LINK) $(LFLAGS) $(LDFLAGS) @<<$(PINBIN)\ppdenc.lnk
+       	$(PPD_OBJS:.obj=.obj+
+       	)
+       	$(PINBIN)\ppdenc.exe
+       	$(PINBIN)\ppdenc.map
+       	
+       	$(PINBIN)\ppdenc.def;
+<<keep
+
+{src}.c{obj}.obj:
+	@echo generating $(@)
+	@icc $(CC_FLAGS) /Fo$(@) src\$(@B).c
