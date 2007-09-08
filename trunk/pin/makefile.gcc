@@ -1,0 +1,45 @@
+#
+# gcc 3.3.5 is required!
+#
+
+TOOLKIT         = u:\os2tk45
+
+INCLUDES        = -I.\include
+
+CFLAGS = -g -Zomf -O2
+LDFLAGS = -s -Zomf -Zmap -Zbin-files
+
+CC              =      gcc
+LIBS            =
+
+PIN_OBJS = obj\afm2pak.o \
+         obj\config.o \
+         obj\conv_afm.o \
+         obj\conv_ppd.o \
+         obj\driverea.o \
+         obj\listdevn.o \
+         obj\listfls.o \
+         obj\listreqf.o \
+         obj\pinmain.o \
+         obj\ppd2pak.o
+
+PPDENC_OBJS = obj\ppdenc.o \
+	 obj\listfls.o
+
+
+all: pin.exe ppdenc.exe
+
+{src}.c{obj}.o:
+	$(CC) -c $(CFLAGS) $(INCLUDES) src\$(@B).c -o $(@)
+
+pin.exe: $(PIN_OBJS) makefile
+	$(CC) -Zexe $(LDFLAGS) -o $@ $(PIN_OBJS)
+
+ppdenc.exe: $(PPDENC_OBJS) makefile
+	$(CC) -Zexe $(LDFLAGS) -o $@ $(LIBS) $(PPDENC_OBJS)
+
+
+clean:
+	rm obj\*.o
+	rm bin\*
+
