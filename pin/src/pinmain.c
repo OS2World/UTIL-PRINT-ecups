@@ -51,6 +51,9 @@
 #include "afm2pak.h"
 #include "ppd2ppb.h"
 
+#ifdef __KLIBC__
+	#define strcmpi strcmp
+#endif
 //
 //
 //

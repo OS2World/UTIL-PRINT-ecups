@@ -101,7 +101,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include <builtin.h>
+#ifndef __KLIBC__
+ 	#include <builtin.h>
+#else
+	typedef INT      *PINT;
+	#define strcmpi strcmp
+#endif
 
 //#include <genplib.h>
 #include "ppd2bin.h"
