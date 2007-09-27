@@ -1,0 +1,22 @@
+DEPTH = ..
+include $(PATH_KBUILD)/header.kmk
+PROGRAMS = pin \
+ 	   ppdenc
+pin_TOOL = VAC308
+pin_SOURCES =src/afm2pak.c \
+           src/config.c \
+         src/conv_afm.c \
+         src/conv_ppd.c \
+         src/driverea.c \
+         src/listdevn.c \
+         src/listfls.c \
+         src/listreqf.c \
+         src/pinmain.c \
+         src/ppd2pak.c
+pin_CFLAGS = -Ss -Iinclude
+
+ppdenc_TOOL =VAC308
+ppdenc_SOURCES= src/ppdenc.c \
+	 src/listfls.c
+ppdenc_CFLAGS = -Ss -Iinclude
+include $(PATH_KBUILD)/footer.kmk
