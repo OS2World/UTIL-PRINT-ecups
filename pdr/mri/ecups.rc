@@ -1,0 +1,19 @@
+#include <os2.h>
+#include "include\ecui.h"
+
+POINTER ECUPS_ICON  LOADONCALL MOVEABLE DISCARDABLE  ecups.ICO
+
+STRINGTABLE
+BEGIN
+    PORT_ID_1               "ECUPS"
+    PORT_DESC_1             "eCUPS Interface"
+    PDR_ID_PROPERTIES       "Properties"
+    ID_NUMBER_OF_DESC_LINES "1"
+    ID_FIRST_DESC_LINES     "eCUPS"
+    PORT_ERR_TITLE          "eCUPS Error"
+    PORT_HELP_TITLE         "eCUPS Help"
+END
+
+
+rcinclude ecups.dlg
+/* rcinclude serial.dlg */
