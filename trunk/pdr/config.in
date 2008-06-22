@@ -1,0 +1,11 @@
+# config.in for PMPDF..
+
+# where is the DDK installed
+DDKBASE		= E:\ddk\base
+
+# where is VAC 308 stored ??
+COMPILER	= E:\IBMCPP
+
+
+PRODUCT = eCUPS: eComStation CUPS integration
+
