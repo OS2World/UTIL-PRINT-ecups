@@ -768,7 +768,9 @@ Init:
     IF InitArgs.0 > 0 THEN globals.!cupsdir = InitArgs.1
 
     IF \VRIsDir( globals.!cupsdir ) THEN DO
-        CALL VRMessage VRWindow(), 'USAGE: CUPSWIZ <cups-path>', 'Missing Argument', 'E'
+        CALL VRMessage VRWindow(), 'Please specify the path where CUPS is installed as follows:' ||,
+                                   '0d0a0d0a'x || 'CUPSWIZ <cups-path>',,
+                                   'Unknown or Invalid CUPS Path', 'E'
         EXIT
     END
 

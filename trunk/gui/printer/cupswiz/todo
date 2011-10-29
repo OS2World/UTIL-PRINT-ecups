@@ -1,4 +1,6 @@
 - Check to make sure CUPS.PDR is installed, and (offer to) install if missing.
+- Ditto for gzip, rinstprn and cupsport.exe
 - Split first-page printer list into manufacturer-model lists.
 - Check if (mode 1) printer is HP-LIP and use ECUPS-HP instead.
 - Use OS2.INI eCups::CUPS ||'\cups' for cups path if found.
+- How to support total remote CUPS (i.e. no local CUPS install)?
