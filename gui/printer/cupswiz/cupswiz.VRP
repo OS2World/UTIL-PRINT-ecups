@@ -1,12 +1,12 @@
 VX-REXX OS/2 V2.14 Build B3
 VRX: cupswiz.VRX
-MacroPath: VRM:E:\DEVELOPMENT\VXREXX\Projects\cupswiz
+MacroPath: VRM:g:\netlabs\svn\ecups\trunk\gui\printer\cupswiz
 EXEPath: 
 RunParameters: f:\cups
 RunDirectory: 
 VRXWindow: __VREMainWindow,1,2409,2554,5770,9106
 VRXWindow: __VRESectionListWindow,1,2481,11708,4529,3891
-VRXWindow: __VREToolsWindow,1,3481,9781,4965,1663
+VRXWindow: __VREToolsWindow,1,3481,9781,4968,1665
 VRXWindow: __VREWindListWindow,1,7022,11708,2650,3891
 UserFile: 1
 UserWindow: WN_MAIN,1

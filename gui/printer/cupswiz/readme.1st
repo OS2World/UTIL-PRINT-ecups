@@ -1,0 +1,38 @@
+CUPSWIZ - prototype CUPS printer-creation wizard
+Test release 1
+
+Make sure cupsport.exe is either in the current directory or in the PATH.
+
+Usage: cupswiz <path-to-cups>
+(e.g. "cupswiz f:\cups")
+
+<path-to-cups> can be omitted if cupswiz.exe is on the same drive as CUPS.
+
+Requirements:
+ - CUPS, including ECUPS.DRV and CUPS.PDR, must be installed and working. 
+   The CUPS daemon must be running.  
+ - CUPS.PDR should have a bldlevel of 1.03 (February 2011) or later.  If
+   not, the created WPS printer object will not work properly until the
+   WPS is restarted.
+ - GNU gzip.exe must be installed (somewhere on the PATH).
+ - RINSTPRN.EXE (included with OS/2 MCP/ACP & eComStation, not sure about
+   earlier verions) must also be somewhere on the PATH.
+ - VROBJ.DLL (included in eComStation or available on Hobbes) is required.
+
+Current limitations: 
+ - CUPS _must_ be installed locally.  You can create a printer on a remote
+   CUPS system, but this requires the use of CUPS tools which need to be
+   present on the system the wizard runs on.
+ - The CUPS printer is always created with default job options.
+ - Currently only ECUPS.DRV is supported (not ECUPS-HP.DRV).
+ - The GUI is still somewhat unpolished.  All printer models are currently
+   displayed in one massive list (not broken down by manufacturer yet).
+ - If your %TMP% directory has spaces in the pathname, the program will
+   almost certainly fail to work properly.  The same applies to your
+   %LOGFILES% directory.
+ - No internationalization support (yet).
+ - No help or documentation.
+ - Probably still has bugs due to my limited testing capabilities.
+
+
+Contact: Alex Taylor (alex at altsan dot org)
