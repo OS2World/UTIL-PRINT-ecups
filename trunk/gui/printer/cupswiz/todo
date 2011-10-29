@@ -1,0 +1,4 @@
+- Check to make sure CUPS.PDR is installed, and (offer to) install if missing.
+- Split first-page printer list into manufacturer-model lists.
+- Check if (mode 1) printer is HP-LIP and use ECUPS-HP instead.
+- Use OS2.INI eCups::CUPS ||'\cups' for cups path if found.
