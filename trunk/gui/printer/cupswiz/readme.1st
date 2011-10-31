@@ -1,5 +1,5 @@
 CUPSWIZ - prototype CUPS printer-creation wizard
-Test release 1
+Test release 2
 
 Make sure cupsport.exe is either in the current directory or in the PATH.
 
@@ -20,9 +20,6 @@ Requirements:
  - VROBJ.DLL (included in eComStation or available on Hobbes) is required.
 
 Current limitations: 
- - CUPS _must_ be installed locally.  You can create a printer on a remote
-   CUPS system, but this requires the use of CUPS tools which need to be
-   present on the system the wizard runs on.
  - The CUPS printer is always created with default job options.
  - Currently only ECUPS.DRV is supported (not ECUPS-HP.DRV).
  - The GUI is still somewhat unpolished.  All printer models are currently
