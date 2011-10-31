@@ -149,7 +149,11 @@ CreateCupsPrinter: PROCEDURE EXPOSE globals.
         cups_cmd = cups_cmd '-D "'globals.!prt_info'"'
     IF globals.!prt_loc <> '' THEN
         cups_cmd = cups_cmd '-L "'globals.!prt_loc'"'
-    cups_cmd = cups_cmd '-v "'globals.!prt_port'" -P "'globals.!prt_ppd'"'
+    IF globals.!prt_dev <> '' THEN
+        cups_cmd = cups_cmd '-v "'globals.!prt_port'" -m' globals.!prt_dev
+    ELSE
+        cups_cmd = cups_cmd '-v "'globals.!prt_port'" -m "'globals.!prt_ppd'"'
+
 
     CALL LINEOUT globals.!log1, 'Creating CUPS printer using:'
     CALL LINEOUT globals.!log1, '   ' cups_cmd
@@ -194,7 +198,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
      * changed.)
      */
     copied_driver = 0
-    driver_path = GetDriverSource( driver )
+    driver_path = GetDriverSource( prnt_drv )
 
     IF ( pmdx <> '') & ( globals.!prdrv <> '') & ( globals.!prdesc <> '') THEN DO
         /* Printer driver is in the local repository, so we can just point
@@ -248,10 +252,10 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     IF result <> 0 THEN
         CALL DeletePort port_name
     ELSE IF port_ok == 1 THEN DO
-        CALL VRMessage VRWindow(), 
+        CALL VRMessage VRWindow(),
                        'The installed version of CUPS.PDR appears to be out of ',
                        'date.  As a result, the desktop printer will not be ',
-                       'useable until the desktop is restarted.',, 
+                       'useable until the desktop is restarted.',,
                        'Port Driver Problem', 'W'
     END
 
@@ -288,10 +292,14 @@ CreatePrinter: PROCEDURE EXPOSE globals.
             END
         END
         ELSE IF PrinterExistsInDRV('ECUPS', globals.!prt_nick ) == 0 THEN DO
-            ok = ImportPPD('ECUPS', globals.!prt_ppd )
-            IF ok <> 0 THEN DO
-                CALL LINEOUT globals.!log1, 'PPD import failed:' ok
-                RETURN 1                /** RC=1  PPD import failed **/
+            IF globals.!prt_ppd == '' THEN
+                CALL PromptForPMName
+            ELSE DO
+                ok = ImportPPD('ECUPS', globals.!prt_ppd )
+                IF ok <> 0 THEN DO
+                    CALL LINEOUT globals.!log1, 'PPD import failed:' ok
+                    RETURN 1                /** RC=1  PPD import failed **/
+                END
             END
         END
 
@@ -350,7 +358,7 @@ ExecRINSTPRN: PROCEDURE EXPOSE globals.
     PARSE ARG dsc, drv, src, rsp
 
     od = DIRECTORY()
-    CALL DIRECTORY src 
+    CALL DIRECTORY src
     rinstprn_cmd = 'rinstprn /DSC:'dsc '/DRV:'drv' /S:'src                    ,
                    '/T:'globals.!bootdrv '/L1:'globals.!logdir'\rinstprn.log' ,
                    '/R:'rsp
@@ -393,11 +401,22 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
     DO QUEUED()
         PARSE PULL line
         PARSE VAR line _type _name
-        IF _type <> 'direct' THEN ITERATE
         IF _name == '' THEN ITERATE
-        i = i + 1
-        devices.i = 'Local printer:' _name
-        ports.i   = _name
+        IF _type == 'network' & POS('://', _name ) > 0 THEN DO
+            PARSE VAR _name _protocol '://' _host '/' _queue
+            IF _protocol == 'socket' THEN _protocol = 'AppSocket'
+            ELSE _protocol = TRANSLATE( _protocol )
+            i = i + 1
+            IF _queue == '' THEN _desc = '('_protocol')'
+            ELSE _desc = _queue '('_protocol')'
+            devices.i = 'Detected network printer' _desc 'at' _host 
+        END
+        ELSE IF _type <> 'direct' THEN ITERATE
+        ELSE DO
+            i = i + 1
+            devices.i = 'Local printer:' _name
+        END
+        ports.i = _name
     END
     devices.0 = i
 
@@ -407,7 +426,7 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
 
     CALL VRSet    'LB_SELECT', 'Painting', 0
     CALL VRMethod 'LB_SELECT', 'AddStringList', 'devices.',, 'ports.'
-    CALL VRMethod 'LB_SELECT', 'AddString', 'Network printer',, ''
+    CALL VRMethod 'LB_SELECT', 'AddString', 'Network printer (manual configuration)',, ''
     CALL VRSet    'LB_SELECT', 'Selected', 1
     CALL VRSet    'LB_SELECT', 'Painting', 1
 
@@ -438,6 +457,9 @@ GetCupsPrinters: PROCEDURE EXPOSE globals.
         IF _name == '' THEN DO
             PARSE VAR line _ppd '.ppd ' _name
             _ppd = _ppd'.ppd'
+        END
+        IF _name == '' THEN DO
+            PARSE VAR line _ppd _name
         END
         IF _name <> '' THEN DO
             i = i + 1
@@ -903,6 +925,20 @@ PB_CREATEOK_Click:
 
 RETURN
 
+/*:VRX         PB_MODELCANCEL_Click
+*/
+PB_MODELCANCEL_Click:
+    CALL SW_MODEL_Close
+    globals.!prt_nick = 'Generic PostScript Printer'
+RETURN
+
+/*:VRX         PB_MODELOK_Click
+*/
+PB_MODELOK_Click:
+    globals.!prt_nick = VRGet( "LB_OS2MODELS", "SelectedString" )
+    CALL SW_MODEL_Close
+RETURN
+
 /*:VRX         PB_NETCANCEL_Click
 */
 PB_NETCANCEL_Click:
@@ -985,14 +1021,29 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals.
             IF ppd == '' THEN DO
                 globals.!mode = 2   /* Mode 2: user-selected PPD file */
                 ppd = VRFileDialog( VRWindow(), 'Select PPD', 'O', '*.ppd')
+                IF ppd == '' THEN RETURN
+                globals.!prt_ppd  = ppd
+                globals.!prt_dev  = ''
+                globals.!prt_nick = GetNameFromPPD( ppd )
             END
             ELSE DO
                 globals.!mode = 1   /* Mode 1: CUPS-included model */
-                ppd = TRANSLATE( globals.!cupsdir'/share/cups/model/'ppd, '\', '/')
+                IF POS('exe://', ppd ) > 0 THEN DO
+                    globals.!prt_ppd  = ''
+                    globals.!prt_dev  = ppd
+                    sel_name = VRMethod('LB_SELECT', 'GetString', selected )
+                    PARSE VAR sel_name _nick ' - CUPS' .
+                    IF _nick == '' THEN
+                        globals.!prt_nick = STRIP( sel_name )
+                    ELSE
+                        globals.!prt_nick = STRIP( _nick )
+                END
+                ELSE DO
+                    globals.!prt_ppd  = TRANSLATE( globals.!cupsdir'/share/cups/model/'ppd, '\', '/')
+                    globals.!prt_dev  = ''
+                    globals.!prt_nick = GetNameFromPPD( ppd )
+                END
             END
-            IF ppd == '' THEN RETURN
-            globals.!prt_ppd = ppd
-            globals.!prt_nick = GetNameFromPPD( ppd )
             globals.!remotecups = ''
 
             CALL InitMessageLog
@@ -1000,8 +1051,11 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals.
                 CALL LINEOUT globals.!log1, 'Starting printer install with user-provided PPD:'
             ELSE
                 CALL LINEOUT globals.!log1, 'Starting printer install for built-in model:'
-            CALL LINEOUT globals.!log1, ' - PPD file:  ' globals.!prt_ppd
-            CALL LINEOUT globals.!log1, ' - Model name:' globals.!prt_nick
+            IF globals.!prt_dev <> '' THEN
+                CALL LINEOUT globals.!log1, ' - Device name:' globals.!prt_dev
+            ELSE
+                CALL LINEOUT globals.!log1, ' - PPD file:   ' globals.!prt_ppd
+            CALL LINEOUT globals.!log1, ' - Model name: ' globals.!prt_nick
             CALL LINEOUT globals.!log1, ''
 
             CALL SetPage2
@@ -1050,16 +1104,46 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals.
                 RETURN
             END
 
+            /* TODO support other drivers
+             */
+            globals.!os2driver = 'ECUPS'
+
             CALL ConfirmAndCreate
         END
 
         WHEN globals.!page == 4 THEN DO
-            CALL VRSet 'PB_NEXT', 'Caption', 'Next >'
+            CALL VRSet 'PB_NEXT',     'Caption', 'Next >'
+            CALL VRSet 'EF_NAME',     'Value', ''
+            CALL VRSet 'EF_LOCATION', 'Value', ''
+            CALL VRSet 'EF_DESC',     'Value', ''
             CALL SetPage1
         END
 
         OTHERWISE NOP
     END
+
+RETURN
+
+/*:VRX         PromptForPMName
+*/
+PromptForPMName: PROCEDURE EXPOSE globals. models. best
+    best = MatchPrinterModel( globals.!os2driver, globals.!prt_nick )
+
+    IF models.0 == 0 THEN DO
+        /* No similar models were found in the list of supported printers.
+         * Just use the generic PS driver.
+         */
+        CALL VRMessage VRWindow(),,
+                       'The printer "'globals.!prt_nick'" does not appear to' ,
+                       'be supported by the' globals.!os2driver 'driver, and' ,
+                       'no similar models were found.  The generic PostScript',
+                       'driver will be used for application support.',,
+                       'Printer Name Not Found', 'E'
+        globals.!prt_nick = 'Generic PostScript Printer'
+        RETURN
+    END
+
+    CALL VRLoadSecondary 'SW_MODEL', 'W'
 
 RETURN
 
@@ -1161,9 +1245,9 @@ SW_CREATE_Init:
     CALL VRSet 'EF_CRMODEL', 'Value', globals.!prt_nick
 
     IF globals.!remotecups <> '' THEN DO
-        /* An existing CUPS printer was indicated.  This means we're not 
+        /* An existing CUPS printer was indicated.  This means we're not
          * creating a CUPS printer, but only a PM printer object (and port)
-         * that points to it.  
+         * that points to it.
          */
         CALL VRSet 'DT_CREATE', 'Caption', 'Ready to create printer object with the following parameters.'
 
@@ -1182,6 +1266,57 @@ SW_CREATE_Init:
         CALL VRSet 'EF_CRLOC',  'Value', globals.!prt_loc
     END
     CALL VRSet 'EF_CRDESC', 'Value', globals.!prt_info
+
+    window = VRInfo( "Object" )
+    if( \VRIsChildOf( window, "Notebook" ) ) then do
+        call VRMethod window, "CenterWindow"
+        call VRSet window, "Visible", 1
+        call VRMethod window, "Activate"
+    end
+    drop window
+
+RETURN
+
+/*:VRX         SW_MODEL_Close
+*/
+SW_MODEL_Close:
+    call SW_MODEL_Fini
+return
+
+/*:VRX         SW_MODEL_Create
+*/
+SW_MODEL_Create:
+    call SW_MODEL_Init
+return
+
+/*:VRX         SW_MODEL_Fini
+*/
+SW_MODEL_Fini:
+
+    CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
+
+    window = VRInfo( "Window" )
+    call VRDestroy window
+    drop window
+return
+/*:VRX         SW_MODEL_Init
+*/
+SW_MODEL_Init:
+
+    /* We should have a list of suggested printer models whose names at least
+     * partially match the requested model, sorted in order with the closest
+     * match at the top.
+     */
+    ok = VRMethod( "LB_OS2MODELS", "AddStringList", "models.",  )
+    IF best > 0 THEN
+        CALL VRSet 'LP_OS2MODELS', 'Selected', best
+
+    CALL VRSet 'DT_MODEL1', 'Caption',,
+               'The printer "'globals.!prt_nick'" could not be found in the'  ,
+               globals.!os2driver'.DRV driver under that name.  Please choose',
+               'the model of printer which will be reported to applications.'
+
+    CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
 
     window = VRInfo( "Object" )
     if( \VRIsChildOf( window, "Notebook" ) ) then do
