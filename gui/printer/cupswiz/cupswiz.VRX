@@ -430,7 +430,7 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
     CALL VRSet    'LB_SELECT', 'Selected', 1
     CALL VRSet    'LB_SELECT', 'Painting', 1
 
-    CALL VRSet 'DT_INFO', 'Caption', 'Select the type of connection to your printer.'
+    CALL VRSet 'DT_INFO', 'Caption', 'Select the connection for this printer.'
 
 RETURN
 
