@@ -56,14 +56,17 @@ GetDriverSource: PROCEDURE EXPOSE globals. pmdx
     END
 
     IF drv_file == '' THEN DO
+        CALL LINEOUT globals.!log1, 'Driver' driver 'is not in the local repository.'
         /* If the driver really isn't in the repository, there are a couple of
          * other places that various install utilities might have put it...
          */
         PARSE VALUE VRGetIni('PM_INSTALL', driver'_DIR', 'USER') WITH drvr_dir '00'x .
         IF drvr_dir == '' THEN
             PARSE VALUE VRGetIni('InstPDR', 'PATH_TO_'driver, 'USER') WITH drvr_dir '00'x .
-        IF drvr_dir <> '' THEN
+        IF drvr_dir <> '' THEN DO
             drv_file = drvr_dir'\'driver'.DRV'
+            CALL LINEOUT globals.!log1, 'Found driver in' drvr_dir'.'
+        END
     END
 
 RETURN drv_file
@@ -236,6 +239,7 @@ RETURN 1
  */
 AddPort_CUPS: PROCEDURE EXPOSE globals.
     PARSE ARG portname, hostname, queuename
+    CALL LINEOUT globals.!log1, 'Creating new port' portname
     ADDRESS CMD '@cupsport' portname hostname queuename '>>' globals.!log2
     IF rc == 1 THEN DO
         CALL VRSetIni 'PM_'portname, 'INITIALIZATION', hostname'#'queuename||'00'x, 'SYSTEM', 'NoClose'
@@ -468,3 +472,58 @@ CleanPPD: PROCEDURE
 
 RETURN
 
+/*:VRX         MatchPrinterModel
+*/
+/* Find a set of printers supported by the OS/2 driver which mostly closely
+ * match the given name.
+ */
+MatchPrinterModel: PROCEDURE EXPOSE globals. models.
+    PARSE UPPER ARG driver_name, printer_name
+    printer_name = TRANSLATE( printer_name, '_', '.')
+    printer_drv = globals.!bootdrv'\OS2\DLL\'driver_name'\'driver_name'.DRV'
+    models.0 = 0
+
+    IF SysGetEA( printer_drv, '.EXPAND', 'exist_ea') <> 0 THEN RETURN 0
+    PARSE VAR exist_ea 1 _eatype 3 .
+    IF C2X( _eatype ) <> 'FDFF' THEN RETURN 0
+
+    PARSE VAR exist_ea 3 _ealen 5 exist_models
+    total_len = C2D( REVERSE( _ealen ))
+
+    /* The variable exist_models now contains a null-separated list of printer
+     * models supported by the driver (including those from previously-imported
+     * PPD files).  Next we check each one against our requested printer name.
+     */
+    start = 1
+    count = 0
+    best  = 0
+    DO WHILE start < total_len
+        _strend = POS('0'x, exist_models, start )
+        IF _strend == 0 THEN LEAVE
+        _model = TRANSLATE( SUBSTR( exist_models, start, _strend - start ))
+        _model = TRANSLATE( _model, ' ', '-')
+        _comp = COMPARE( _model, printer_name )
+        IF WORD( _model, 1 ) == WORD( printer_name, 1 ) THEN DO
+            count = count + 1
+            IF _comp == 0 THEN DO
+                _comp = 9999
+                best  = count
+            END
+            ELSE IF ( best == 0 ) & ( _comp > LENGTH( printer_name )) THEN
+                best = count
+/*
+            models.count = RIGHT( _comp, 4, '0') SUBSTR( exist_models, start, _strend - start )
+*/
+            models.count = SUBSTR( exist_models, start, _strend - start )
+        END
+        start = _strend + 1
+    END
+    models.0 = count
+
+/*
+    CALL SysStemSort 'models.', 'D', 'I',,, 1, 4
+    DO i = 1 TO count
+        models.i = SUBWORD( models.i, 2 )
+    END
+*/
+RETURN best
