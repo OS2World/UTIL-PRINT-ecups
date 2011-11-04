@@ -281,21 +281,21 @@ CreatePrinter: PROCEDURE EXPOSE globals.
     /* Now create the OS/2 printer object */
     IF create_os2 == 1 THEN DO
 
-        /* Make sure ECUPS.DRV has the printer */
+        /* Make sure the presentation driver supports the printer */
         IF globals.!mode == 2 THEN DO
             /* Always (re)import when a PPD is provided by the user
              */
-            ok = ImportPPD('ECUPS', globals.!prt_ppd )
+            ok = ImportPPD( globals.!os2driver, globals.!prt_ppd )
             IF ok <> 0 THEN DO
                 CALL LINEOUT globals.!log1, 'PPD import failed:' ok
                 RETURN 1                /** RC=1  PPD import failed **/
             END
         END
-        ELSE IF PrinterExistsInDRV('ECUPS', globals.!prt_nick ) == 0 THEN DO
+        ELSE IF PrinterExistsInDRV( globals.!os2driver, globals.!prt_nick ) == 0 THEN DO
             IF globals.!prt_ppd == '' THEN
                 CALL PromptForPMName
             ELSE DO
-                ok = ImportPPD('ECUPS', globals.!prt_ppd )
+                ok = ImportPPD(globals.!os2driver, globals.!prt_ppd )
                 IF ok <> 0 THEN DO
                     CALL LINEOUT globals.!log1, 'PPD import failed:' ok
                     RETURN 1                /** RC=1  PPD import failed **/
@@ -303,7 +303,7 @@ CreatePrinter: PROCEDURE EXPOSE globals.
             END
         END
 
-        ok = CreateOS2Printer('ECUPS')
+        ok = CreateOS2Printer( globals.!os2driver )
         IF ok <> 0 THEN
             RETURN 3                    /** RC=3  Error running rinstprn **/
     END
@@ -330,11 +330,13 @@ DDCB_PROTOCOL_Change: PROCEDURE
             show_queue = 1
             show_user  = 1
             show_pass  = 0
+            /* CALL VRSet 'DT_USERID', 'Caption', 'User ID (if required):' */
         END
         WHEN which == 4 THEN DO     /* SMB */
             show_queue = 1
             show_user  = 1
             show_pass  = 1
+            /* CALL VRSet 'DT_QUEUE', 'Caption', 'Shared printer name:' */
         END
         OTHERWISE DO                /* CUPS */
             show_queue = 1
@@ -919,6 +921,7 @@ PB_CREATEOK_Click:
 
     create_os2 = VRGet('CHK_CREATEPM', 'Set')
     globals.!os2printer = create_os2
+    globals.!os2driver  = VRGet('DDCB_PRESDRV', 'SelectedString')
     globals.!create = 1
 
     CALL SW_CREATE_Close
@@ -1106,7 +1109,12 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals.
 
             /* TODO support other drivers
              */
-            globals.!os2driver = 'ECUPS'
+            IF WORD( globals.!prt_nick, 1 ) == 'Apollo' |,
+               WORD( globals.!prt_nick, 1 ) == 'HP' |,
+               WORD( globals.!prt_nick, 1 ) == 'Hewlett-Packard' THEN
+                globals.!os2driver = 'ECUPS-HP'
+            ELSE
+                globals.!os2driver = 'ECUPS'
 
             CALL ConfirmAndCreate
         END
@@ -1266,6 +1274,19 @@ SW_CREATE_Init:
         CALL VRSet 'EF_CRLOC',  'Value', globals.!prt_loc
     END
     CALL VRSet 'EF_CRDESC', 'Value', globals.!prt_info
+
+    IF QueryAvailableDrivers() > 0 THEN DO
+        def_idx = 1
+        CALL VRMethod 'DDCB_PRESDRV', 'AddStringList', 'drv_list.'
+        DO i = 1 TO drv_list.0
+            IF drv_list.i == globals.!os2driver THEN DO
+                def_idx = i
+                LEAVE
+            END
+        END
+        CALL VRSet 'DDCB_PRESDRV', 'Selected', def_idx
+    END
+    /* TODO give an error if no drivers were found */
 
     window = VRInfo( "Object" )
     if( \VRIsChildOf( window, "Notebook" ) ) then do
