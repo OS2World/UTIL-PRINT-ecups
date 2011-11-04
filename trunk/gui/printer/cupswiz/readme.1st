@@ -1,5 +1,5 @@
 CUPSWIZ - prototype CUPS printer-creation wizard
-Test release 2
+Test release x
 
 Make sure cupsport.exe is either in the current directory or in the PATH.
 
@@ -21,7 +21,6 @@ Requirements:
 
 Current limitations: 
  - The CUPS printer is always created with default job options.
- - Currently only ECUPS.DRV is supported (not ECUPS-HP.DRV).
  - The GUI is still somewhat unpolished.  All printer models are currently
    displayed in one massive list (not broken down by manufacturer yet).
  - If your %TMP% directory has spaces in the pathname, the program will

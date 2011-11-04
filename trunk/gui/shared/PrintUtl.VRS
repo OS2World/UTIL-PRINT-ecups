@@ -418,7 +418,7 @@ RETURN nickname
 /*:VRX         CleanPPD
 */
 /* Clean out lines from Gutenprint and Foomatic PPD files that are known to
- * cause problems when importing with PIN.  (Partially based on work Paul
+ * cause problems when importing with PIN.  (Partially based on work by Paul
  * Smedley and Peter Brown).
  */
 CleanPPD: PROCEDURE
@@ -527,3 +527,23 @@ MatchPrinterModel: PROCEDURE EXPOSE globals. models.
     END
 */
 RETURN best
+
+/*:VRX         QueryAvailableDrivers
+*/
+/* Determine which of our supported PrinterPak drivers are currently available.
+ */
+QueryAvailableDrivers: PROCEDURE EXPOSE globals. drv_list.
+    drv_list.0 = 0
+
+    test_drivers = 'ECUPS ECUPS-HP PSPRINT'
+    DO i = 1 TO WORDS( test_drivers )
+        driver = WORD( test_drivers, i )
+        ok = GetDriverSource( driver )
+        IF ok == '' THEN
+            ok = VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER')
+        IF ok <> '' THEN
+            CALL SysStemInsert 'drv_list.', drv_list.0+1, driver
+    END
+
+RETURN drv_list.0
+
