@@ -411,7 +411,7 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
             i = i + 1
             IF _queue == '' THEN _desc = '('_protocol')'
             ELSE _desc = _queue '('_protocol')'
-            devices.i = 'Detected network printer' _desc 'at' _host 
+            devices.i = 'Detected network printer' _desc 'at' _host
         END
         ELSE IF _type <> 'direct' THEN ITERATE
         ELSE DO
@@ -438,7 +438,7 @@ RETURN
 
 /*:VRX         GetCupsPrinters
 */
-GetCupsPrinters: PROCEDURE EXPOSE globals.
+GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
 
     CALL VRSet 'DT_INFO', 'Caption', 'Getting list of supported printers.  Please wait...'
 
@@ -451,9 +451,11 @@ GetCupsPrinters: PROCEDURE EXPOSE globals.
 
     ADDRESS CMD '@' lpinfo_cmd listqueue
     i = 0
+    makers = ''
     DO QUEUED()
         PARSE PULL line
         IF LEFT( line, 6 ) == 'drv://' THEN ITERATE
+        IF WORD( line, 1 ) == 'raw' THEN ITERATE
         PARSE VAR line _ppd '.ppd.gz ' _name
         _ppd = _ppd'.ppd.gz'
         IF _name == '' THEN DO
@@ -464,6 +466,8 @@ GetCupsPrinters: PROCEDURE EXPOSE globals.
             PARSE VAR line _ppd _name
         END
         IF _name <> '' THEN DO
+            PARSE VAR _name _brand _model
+            IF WORDPOS( _brand, makers ) == 0 THEN makers = makers || _brand' '
             i = i + 1
             ppds.i   = _ppd
             models.i = _name
@@ -476,13 +480,87 @@ GetCupsPrinters: PROCEDURE EXPOSE globals.
     CALL RXQUEUE 'DELETE', listqueue
     CALL DIRECTORY _od
 
-    CALL VRSet    'LB_SELECT', 'Painting', 0
-    CALL VRMethod 'LB_SELECT', 'AddString', '-- Other printer (requires PPD) --',, ''
-    CALL VRMethod 'LB_SELECT', 'AddStringList', 'models.',, 'ppds.'
-    CALL VRSet    'LB_SELECT', 'Selected', 1
-    CALL VRSet    'LB_SELECT', 'Painting', 1
+/* Now build the 'manufacturers' stem.
+ * This stem takes the following format:
+ *    manufacturers.0                         number of manufacturers
+ *    manufacturers.i.!name                   manufacturer name (e.g. 'Apple')
+ *    manufacturers.i.!printers.0             number of printer models
+ *    manufacturers.i.!printers.j.!model      printer model name, short form (e.g. 'LaserWriter 330')
+ *    manufacturers.i.!printers.j.!type       driver version/type (e.g. 'Gutenprint v5.2.7')
+ *    manufacturers.i.!printers.j.!driver     the internal CUPS printer driver name (PPD or URI)
+ *                                            - by preference this is the "simplified" version if available
+ *    manufacturers.i.!printers.j.!remark     any distinguishing remarks (e.g. 'Simplified')
+ *    manufacturers.i.!printers.j.!driver2    alternate driver in case there is more than one (PPD or URI)
+ *                                            - if defined this is usually the non-"simplified" driver
+ *    manufacturers.i.!printers.j.!remark2    any distinguishing remarks for the alternate driver
+ */
 
-    CALL VRSet 'DT_INFO', 'Caption', 'Select your printer model.'
+    manufacturers.0 = WORDS( makers )
+    DO i = 1 TO manufacturers.0
+        manufacturers.i.!name = WORD( makers, i )
+        manufacturers.i.!printers.0 = 0
+    END
+
+    DO i = 1 TO models.0
+        PARSE VAR models.i _brand _model ' - CUPS+' _type
+        man = WORDPOS( _brand, makers )
+        IF man == 0 THEN ITERATE
+
+        PARSE VAR _type _version 'Simplified' .
+        _version = STRIP( _version )
+        _flag    = RIGHT( _type, 10 )
+
+        count = manufacturers.man.!printers.0
+        IF count > 0 THEN DO
+            /* If there are two or more printers defined with the same model
+             * name and driver version, keep the first and last as the regular
+             * and alternate drivers; if one if them is 'Simplified', make that
+             * the regular driver by preference.
+             */
+            IF ( manufacturers.man.!printers.count.!model == _model ) & ,
+               ( manufacturers.man.!printers.count.!type  == _version ) THEN
+            DO
+                IF ( WORD( _version, 1 ) == 'Gutenprint') & ( _flag == 'Simplified') THEN DO
+                    manufacturers.man.!printers.count.!driver2 = manufacturers.man.!printers.count.!driver
+                    manufacturers.man.!printers.count.!remark2 = manufacturers.man.!printers.count.!remark
+                    manufacturers.man.!printers.count.!driver  = ppds.i
+                    manufacturers.man.!printers.count.!remark  = 'Simplified'
+                END
+                ELSE DO
+                    manufacturers.man.!printers.count.!driver2 = ppds.i
+                    IF _flag == 'Simplified' THEN
+                        manufacturers.man.!printers.count.!remark2 = 'Simplified'
+                    ELSE
+                        manufacturers.man.!printers.count.!remark2 = ''
+                END
+                ITERATE
+            END
+        END
+        count = count + 1
+        manufacturers.man.!printers.count.!model   = _model
+        manufacturers.man.!printers.count.!type    = _version
+        manufacturers.man.!printers.count.!driver  = ppds.i
+        IF _flag == 'Simplified' THEN
+            manufacturers.man.!printers.count.!remark = 'Simplified'
+        ELSE
+            manufacturers.man.!printers.count.!remark = ''
+        manufacturers.man.!printers.count.!driver2 = ''
+        manufacturers.man.!printers.count.!remark2 = ''
+        manufacturers.man.!printers.0 = count
+    END
+
+    /* Add one more category for special items ...
+     */
+    count = manufacturers.0 + 1
+    manufacturers.count.!name = '-- Custom --'
+    manufacturers.count.!printers.0 = 1
+    manufacturers.count.!printers.1.!model   = '-- Other printer (requires PPD) --'
+    manufacturers.count.!printers.1.!driver  = ''
+    manufacturers.count.!printers.1.!type    = ''
+    manufacturers.count.!printers.1.!remark  = '-- Other printer (requires PPD) --'
+    manufacturers.count.!printers.1.!driver2 = ''
+    manufacturers.count.!printers.1.!remark2 = ''
+    manufacturers.0 = count
 
 RETURN
 
@@ -834,6 +912,82 @@ InitMessageLog: PROCEDURE EXPOSE globals.
                  COPIES('-', 73 - LENGTH( datestr ))
 RETURN
 
+/*:VRX         LB_BRAND_Click
+*/
+LB_BRAND_Click: PROCEDURE EXPOSE globals. manufacturers.
+
+    CALL VRSet 'WN_MAIN', 'StatusText', ''
+
+    index = VRGet('LB_BRAND', 'Selected')
+    IF index == 0 THEN RETURN
+
+    item = VRMethod('LB_BRAND', 'GetItemData', index )
+    IF item == 0 THEN RETURN
+
+    DO i = 1 TO manufacturers.item.!printers.0
+        models.i = manufacturers.item.!printers.i.!model
+        /* ppds.i   = manufacturers.item.!printers.i.!driver */
+        IF manufacturers.item.!printers.i.!driver == '' THEN
+            ppds.i = ''
+        ELSE
+            ppds.i   = i
+
+/* DEBUG
+say 'Model:    ' manufacturers.item.!printers.i.!model
+say 'Driver:   ' manufacturers.item.!printers.i.!driver
+say '          ' manufacturers.item.!printers.i.!longname
+if manufacturers.item.!printers.i.!driver2 <> '' then
+    say 'Alternate:' manufacturers.item.!printers.i.!driver2
+if manufacturers.item.!printers.i.!longname2 <> '' then
+    say '          ' manufacturers.item.!printers.i.!longname2
+say 'Type:     ' manufacturers.item.!printers.i.!type
+say '---'
+ */
+
+    END
+    models.0 = manufacturers.item.!printers.0
+    ppds.0 = manufacturers.item.!printers.0
+
+    CALL VRSet    'LB_SELECT', 'Painting', 0
+    CALL VRMethod 'LB_SELECT', 'Clear'
+    CALL VRMethod 'LB_SELECT', 'AddStringList', 'models.',, 'ppds.'
+    CALL VRSet    'LB_SELECT', 'Painting', 1
+
+RETURN
+
+/*:VRX         LB_SELECT_Click
+*/
+LB_SELECT_Click: PROCEDURE EXPOSE globals. manufacturers.
+    SELECT
+        WHEN globals.!page == 1 THEN DO
+            CALL VRSet 'WN_MAIN', 'StatusText', ''
+
+            brand = VRGet('LB_BRAND', 'Selected')
+            IF brand == 0 THEN RETURN
+            selected = VRGet('LB_SELECT', 'Selected')
+            IF selected == 0 THEN RETURN
+            which = VRMethod('LB_SELECT', 'GetItemData', selected )
+            IF which == '' THEN RETURN
+            man = VRMethod('LB_BRAND', 'GetItemData', brand )
+            IF man == '' THEN RETURN
+
+            make  = manufacturers.man.!name
+            model = manufacturers.man.!printers.which.!model
+            driver = manufacturers.man.!printers.which.!type
+            remark = manufacturers.man.!printers.which.!remark
+            IF remark == '' THEN 
+                type = ' ('driver')'
+            ELSE
+                type = ' ('driver' - 'remark')'
+
+            CALL VRSet 'WN_MAIN', 'StatusText', make model type
+        END
+
+        OTHERWISE NOP
+    END
+
+RETURN
+
 /*:VRX         LoadSettings
 */
 LoadSettings: PROCEDURE EXPOSE globals.
@@ -902,6 +1056,12 @@ LoopbackName: PROCEDURE
     END
 
 RETURN lo_name
+
+/*:VRX         PB_ABOUT_Click
+*/
+PB_ABOUT_Click: 
+    CALL SW_ABOUT_Close
+RETURN
 
 /*:VRX         PB_CANCEL_Click
 */
@@ -1013,15 +1173,19 @@ RETURN
 
 /*:VRX         PB_NEXT_Click
 */
-PB_NEXT_Click: PROCEDURE EXPOSE globals.
+PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
 
     SELECT
         WHEN globals.!page == 1 THEN DO
+            brand = VRGet('LB_BRAND', 'Selected')
+            IF brand == 0 THEN RETURN
             selected = VRGet('LB_SELECT', 'Selected')
             IF selected == 0 THEN RETURN
 
-            ppd = VRMethod('LB_SELECT', 'GetItemData', selected )
-            IF ppd == '' THEN DO
+            CALL VRSet 'WN_MAIN', 'StatusText', ''
+
+            which = VRMethod('LB_SELECT', 'GetItemData', selected )
+            IF which == '' THEN DO
                 globals.!mode = 2   /* Mode 2: user-selected PPD file */
                 ppd = VRFileDialog( VRWindow(), 'Select PPD', 'O', '*.ppd')
                 IF ppd == '' THEN RETURN
@@ -1030,11 +1194,18 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals.
                 globals.!prt_nick = GetNameFromPPD( ppd )
             END
             ELSE DO
+                man = VRMethod('LB_BRAND', 'GetItemData', brand )
+                IF man == '' THEN DO
+                    /* TODO display an error?  But this shouldn't be possible... */
+                    RETURN
+                END
+                ppd = manufacturers.man.!printers.which.!driver
                 globals.!mode = 1   /* Mode 1: CUPS-included model */
                 IF POS('exe://', ppd ) > 0 THEN DO
                     globals.!prt_ppd  = ''
                     globals.!prt_dev  = ppd
-                    sel_name = VRMethod('LB_SELECT', 'GetString', selected )
+                    sel_brand = VRGet('LB_BRAND', 'SelectedString')
+                    sel_name = sel_brand VRMethod('LB_SELECT', 'GetString', selected )
                     PARSE VAR sel_name _nick ' - CUPS' .
                     IF _nick == '' THEN
                         globals.!prt_nick = STRIP( sel_name )
@@ -1050,7 +1221,7 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals.
             globals.!remotecups = ''
 
             CALL InitMessageLog
-            IF globals.!mode ==2 THEN
+            IF globals.!mode == 2 THEN
                 CALL LINEOUT globals.!log1, 'Starting printer install with user-provided PPD:'
             ELSE
                 CALL LINEOUT globals.!log1, 'Starting printer install for built-in model:'
@@ -1132,6 +1303,12 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals.
 
 RETURN
 
+/*:VRX         PICT_ICON_Click
+*/
+PICT_ICON_Click: PROCEDURE EXPOSE globals.
+    CALL VRLoadSecondary 'SW_ABOUT', 'W'
+RETURN
+
 /*:VRX         PromptForPMName
 */
 PromptForPMName: PROCEDURE EXPOSE globals. models. best
@@ -1165,16 +1342,39 @@ return
 
 /*:VRX         SetPage1
 */
-SetPage1: PROCEDURE EXPOSE globals.
+SetPage1: PROCEDURE EXPOSE globals. manufacturers.
 
-    CALL VRSet 'LB_SELECT',   'Visible', 1
-    CALL VRSet 'GB_INFO',     'Visible', 0
+    CALL VRSet 'LB_BRAND', 'Visible', 1
+
+    /* Resize LB_SELECT if necessary to make room for LB_BRAND */
+    lb_x = VRGet('LB_BRAND', 'Left') + VRGet('LB_BRAND', 'Width') + 60
+    lb_w = VRGet('GB_INFO', 'Width') - lb_x + VRGet('GB_INFO', 'Left')
+    CALL VRSet 'LB_SELECT', 'Left', lb_x
+    CALL VRSet 'LB_SELECT', 'Width', lb_w
+
+    CALL VRSet 'LB_SELECT', 'Visible', 1
+    CALL VRSet 'GB_INFO',   'Visible', 0
 
     globals.!page = 1
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
     CALL GetCupsPrinters
+
+    CALL VRSet 'DT_INFO', 'Caption', 'Select your printer model.'
+
+    /* Populate the manufacturer list */
+    CALL VRSet 'LB_BRAND',  'Painting', 0
+    DO i = 1 TO manufacturers.0
+        addman.i = manufacturers.i.!name
+        addidx.i = i
+    END
+    addman.0 = manufacturers.0
+    addidx.0 = manufacturers.0
+    CALL VRMethod 'LB_BRAND', 'AddStringList', 'addman.',, 'addidx.'
+    CALL VRSet 'LB_BRAND',  'Painting', 1
+
     CALL VRMethod 'LB_SELECT', 'SetFocus'
     CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
+
 RETURN
 
 /*:VRX         SetPage2
@@ -1182,6 +1382,15 @@ RETURN
 SetPage2: PROCEDURE EXPOSE globals.
 
     globals.!page = 2
+    CALL VRSet 'LB_BRAND', 'Visible', 0
+    CALL VRSet 'WN_MAIN', 'StatusText', 'Selected printer: ' globals.!prt_nick 
+
+    /* Resize LB_SELECT to the full width of GB_INFO */
+    lb_x = VRGet('GB_INFO', 'Left')
+    lb_w = VRGet('GB_INFO', 'Width')
+    CALL VRSet 'LB_SELECT', 'Left', lb_x
+    CALL VRSet 'LB_SELECT', 'Width', lb_w
+
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
     CALL GetCupsPorts
     CALL VRMethod 'LB_SELECT', 'SetFocus'
@@ -1222,10 +1431,47 @@ RETURN
 SetPage4:
 
     globals.!page = 4
-    CALL VRSet 'LB_SELECT',   'Visible', 0
-    CALL VRSet 'GB_INFO',     'Visible', 0
+    CALL VRSet 'LB_SELECT', 'Visible',    0
+    CALL VRSet 'GB_INFO',   'Visible',    0
+    CALL VRSet 'WN_MAIN',   'StatusText', ''
 
 RETURN
+
+/*:VRX         SW_ABOUT_Close
+*/
+SW_ABOUT_Close: 
+    call SW_ABOUT_Fini
+return
+
+/*:VRX         SW_ABOUT_Create
+*/
+SW_ABOUT_Create: 
+    call SW_ABOUT_Init
+return
+
+/*:VRX         SW_ABOUT_Fini
+*/
+SW_ABOUT_Fini: 
+    window = VRInfo( "Window" )
+    call VRDestroy window
+    drop window
+return
+/*:VRX         SW_ABOUT_Init
+*/
+SW_ABOUT_Init: 
+
+    CALL VRSet 'DT_BOOTDRIVE',  'Caption', 'System boot volume:' TRANSLATE( globals.!bootdrv )
+    CALL VRSet 'DT_CUPSPATH',   'Caption', 'Local CUPS directory:' TRANSLATE( globals.!cupsdir )
+    CALL VRSet 'DT_REPOSITORY', 'Caption', 'Local driver repository:' TRANSLATE( globals.!repository )
+
+    window = VRInfo( "Object" )
+    if( \VRIsChildOf( window, "Notebook" ) ) then do
+        call VRMethod window, "CenterWindow"
+        call VRSet window, "Visible", 1
+        call VRMethod window, "Activate"
+    end
+    drop window
+return
 
 /*:VRX         SW_CREATE_Close
 */

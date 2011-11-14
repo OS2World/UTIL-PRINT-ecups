@@ -1,5 +1,5 @@
 - Check to make sure CUPS.PDR is installed, and (offer to) install if missing.
 - Ditto for gzip.exe, rinstprn.exe and cupsport.exe
-- Split first-page printer list into manufacturer-model lists.
 - Use OS2.INI eCups::CUPS ||'\cups' for cups path if found.
 - How to support total remote CUPS (i.e. no local CUPS install)?
+- Offer the option to show both simplified/expert drivers
