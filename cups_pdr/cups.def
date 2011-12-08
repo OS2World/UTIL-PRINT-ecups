@@ -1,0 +1,20 @@
+LIBRARY CUPS INITINSTANCE TERMINSTANCE
+DESCRIPTION '@#netlabs.org:1.03#@##1## 16 Feb 2011 20:53:08     sigel::::::@@@#netlabs.org:1.03#@##1## 16 Feb 2011 20:08:22     sigel::::::@@@#netlabs.org:1.'
+PROTMODE
+DATA MULTIPLE NONSHARED LOADONCALL
+CODE LOADONCALL
+EXPORTS
+SPLPDENUMPORT      = SplPdEnumPort         @501
+SPLPDINSTALLPORT   = SplPdInstallPort      @502
+SPLPDGETPORTICON   = SplPdGetPortIcon      @503
+SPLPDQUERYPORT     = SplPdQueryPort        @504
+SPLPDSETPORT       = SplPdSetPort          @505
+SPLPDREMOVEPORT    = SplPdRemovePort       @506
+SPLPDOPEN          = SplPdOpen             @508
+SPLPDWRITE         = SplPdWrite            @509
+SPLPDABORTDOC      = SplPdAbortDoc         @510
+SPLPDNEWPAGE       = SplPdNewPage          @511
+SPLPDCLOSE         = SplPdClose            @512
+SPLPDQUERY         = SplPdQuery            @513
+SPLPDSET           = SplPdSet              @514
+
