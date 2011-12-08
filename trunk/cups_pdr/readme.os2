@@ -1,0 +1,39 @@
+CUPS port driver for OS/2 & eComStation 2011-02-16
+
+This is a first attempt at a port driver for CUPS for OS/2 & eComStation, based heavily on the source code for LPR32 by Serge Sterck.
+
+What is basically does is copy the print job to a temporary file, then call cupslpr.exe (same as lpr.exe in CUPS 1.3.7 but renamed to avoid confusion with the IBM lpr.exe) with the appropriate parameters.
+
+Current limitations:
+1) No status of whether the job works or not - it just disappears from the queue
+2) ????
+
+History:
+2011-02-16      - implemented SplPdSet and SplPdQuery APIs
+                - cupslpr.exe is now loaded from the path where TCP/IP is installed (even if not on the boot drive)
+                - removed useless binary-mode checkbox from properties dialog (it did nothing anyway)
+                - other minor cleanup
+                - added bldlevel string
+2010-07-20      - auto-generated CUPS port names now use normal numbering instead of base 4
+2009-04-09  	- fixed bug causing initialization of default description to fail on port install
+		- description is now set to the host/queue (like slpr)
+		- eliminated annoying icon spam on port installation control (requires EAs)
+		- improved icon, tidied up properties dialog 
+		- Thanks to Alex Taylor for the above!
+?2009-03-19? 	- added message dialog if cupslpr returns error
+2008-06-28  	- ensured that all postscript files start with %!PS-Adobe-3.0 - fixes problems printing from Lucide
+		- moved to IBM CPP v3.6.5
+
+Installation:
+1) Copy cupslpr.exe to \tcpip\bin on the drive where TCP/IP is installed, usually the boot drive (more specifically, it should be whichever directory inetd.exe is located in)
+2) Copy cups.pdr to \os2\dll on the drive the OS is booted from
+3) Install a new port in the printer object 'Output Port' tab, Install New port...
+4) Enter the CUPS printer name as Queue Name
+5) Once finished - click Save
+6) Test printing with a postscript driver
+7) Report feedback to paul@smedley.id.au or to the eCups mailing list!
+
+Cheers,
+
+Paul Smedley
+10th April, 2009

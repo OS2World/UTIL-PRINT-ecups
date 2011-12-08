@@ -1,0 +1,19 @@
+#ifndef OS2_INCLUDED
+   #include <os2.h>
+#endif
+DLGINCLUDE 1 "cups.h"
+
+DLGTEMPLATE IDD_CUPS LOADONCALL MOVEABLE DISCARDABLE
+BEGIN
+    DIALOG  "Port Properties - ", IDD_CUPS, 49, 78, 202, 60, FS_NOBYTEALIGN | FS_SYSMODAL | WS_VISIBLE | WS_SYNCPAINT, FCF_SYSMENU | FCF_TITLEBAR | FCF_NOBYTEALIGN
+            PRESPARAMS PP_FONTNAMESIZE, "9.WarpSans"
+    BEGIN
+        LTEXT           "CUPS Server:", -1, 3, 45, 83, 8, DT_VCENTER
+        ENTRYFIELD      "", ID_IP, 88, 46, 109, 8, ES_MARGIN
+        LTEXT           "CUPS Printer Name:", -1, 3, 31, 83, 8, DT_VCENTER
+        ENTRYFIELD      "", ID_CUPSQUEUE, 88, 32, 66, 8, ES_MARGIN
+        AUTOCHECKBOX    "Send as binary file", ID_BINARY, 3, 18, 152, 10, NOT WS_VISIBLE
+        DEFPUSHBUTTON   "OK", DID_OK, 3, 2, 40, 12
+        PUSHBUTTON      "Cancel ", DID_CANCEL, 45, 2, 40, 12
+    END
+END
