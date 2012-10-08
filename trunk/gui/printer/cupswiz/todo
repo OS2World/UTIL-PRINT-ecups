@@ -1,5 +1,7 @@
 - Check to make sure CUPS.PDR is installed, and (offer to) install if missing.
 - Ditto for gzip.exe, rinstprn.exe and cupsport.exe
-- Use OS2.INI eCups::CUPS ||'\cups' for cups path if found.
-- How to support total remote CUPS (i.e. no local CUPS install)?
-- Offer the option to show both simplified/expert drivers
+- Offer the option to show both simplified/expert drivers.
+- Allow setting at least some basic job options like paper/colour/quality.
+- I18N support
+- Is there a way to generate the PPD for driver import when using exe://?  e.g.
+  get the saved PPD from the cups\etc\cups\ppd directory.
