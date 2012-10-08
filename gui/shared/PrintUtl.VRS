@@ -118,7 +118,13 @@ RETURN 1
 
 /*:VRX         CopyDriverToSource
 */
-/* Copy driver files to the source (repository) directory used for installation.
+/* Copies a printerpak driver and all its files from one directory to another.
+ * Usually the target is the source (repository) directory used for
+ * installation, hence the function name.  However, this routine can be used
+ * in other contexts as well.
+ *
+ *   driver    - The fully-qualified filename of the printerpak driver
+ *   newdrvdir - The directory where the files will be copied; must exist
  */
 CopyDriverToSource: PROCEDURE EXPOSE globals.
     PARSE ARG driver, newdrvdir
@@ -227,7 +233,10 @@ CreateDriverList: PROCEDURE EXPOSE globals.
             offs = offs + inc
         END
         CALL LINEOUT listfile
+        CALL LINEOUT globals.!log1, 'Created driver list' listfile 'for' driver'.'
     END
+    ELSE
+        CALL LINEOUT globals.!log1, 'No drivers found in' driver '(missing .EXPAND extended attribute?)'
 
 RETURN 1
 
@@ -305,6 +314,30 @@ GetQueueName: PROCEDURE
 RETURN queuename
 
 
+/*:VRX         InstallPrintDriver
+*/
+/* 'Installs' (that is to say, registers with the spooler) an OS printer
+ * device driver/model.  Installs the corresponding printerpak driver if
+ * necessary.
+ *
+ *   driver     - The name of the printerpak driver (without path or extension)
+ *   driverfull - The fully-qualified filename of the printerpak driver
+ *   model      - The printer make/model name used by the driver
+ */
+InstallPrintDriver: PROCEDURE EXPOSE globals.
+    PARSE ARG driver, driverfull, model
+
+    targetdir = globals.!os2dir'\DLL\'driver
+    IF ( VRFileExists( targetdir'\'driver'.DRV') == 0 ) THEN DO
+        CALL VRMkDir targetdir
+        rc = CopyDriverToSource( driverfull, targetdir )
+    END
+    IF VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER', 'NoClose') <> driverfull THEN
+        CALL VRSetIni 'PM_DEVICE_DRIVERS', driver, driverfull||'00'x, 'USER'
+    CALL VRSetIni 'PM_SPOOLER_DD', driver'.'model, driver'.DRV;;;'||'00'x, 'SYSTEM'
+RETURN rc
+
+
 /*:VRX         RSPCreatePort
 */
 /* Create/update a RINSTPRN response file to create the specified port.
@@ -337,14 +370,39 @@ RSPCreatePrinter: PROCEDURE
     IF STREAM( rsp, 'C', 'QUERY EXISTS') <> '' THEN
         CALL SysFileDelete rsp
 
-/* temporary for testing  */
+    /* This is temporary until we can implement proper options configuration */
     PARSE UPPER VALUE VALUE('LANG',,'OS2ENVIRONMENT') WITH 1 . 4 _ctry 6 .
-    IF _ctry == 'CA' | _ctry == 'US' THEN
+    IF ( WORDPOS( _ctry, 'US CA MX BO CO VE PH CL') > 0 ) THEN
         page = 'Letter'
     ELSE
         page = 'A4'
-    o9n   = 'PORTRAIT'
-/* */
+    o9n = 'PORTRAIT'
+
+    CALL LINEOUT rsp, '* Creates both a printer queue and a desktop object for this printer.'
+    CALL LINEOUT rsp, '*'
+    CALL LINEOUT rsp, 'ADDQUEUE'
+    CALL LINEOUT rsp, '    NAME       =' queuename
+    CALL LINEOUT rsp, '    COMMENT    =' printername
+    CALL LINEOUT rsp, '    DRIVERNAME =' driver'.'model
+    CALL LINEOUT rsp, '    PORT       =' portname
+    CALL LINEOUT rsp, '    DEFINEQUEUEPROPS'
+    CALL LINEOUT rsp, '        FORMNAME    =' page
+    CALL LINEOUT rsp, '        ORIENTATION =' o9n
+    CALL LINEOUT rsp, '    ENDQUEUEPROPS'
+    CALL LINEOUT rsp, 'ENDQUEUE'
+    CALL LINEOUT rsp, ''
+    CALL LINEOUT rsp
+RETURN 1
+
+
+/*:VRX         RSPInstallDriver
+*/
+/* Create/update a RINSTPRN response file to install the specified printer
+ * driver.  (This doesn't always seem to work so we don't use it except as
+ * a fallback.)
+ */
+RSPInstallDriver: PROCEDURE
+    PARSE ARG rsp, driver, model
 
     CALL LINEOUT rsp, '* Installs the' driver 'PrinterPak driver.'
     CALL LINEOUT rsp, '*'
@@ -359,18 +417,6 @@ RSPCreatePrinter: PROCEDURE
     CALL LINEOUT rsp, '    DRIVER     =' driver
     CALL LINEOUT rsp, 'ENDPRINTDEVICE'
     CALL LINEOUT rsp, ''
-    CALL LINEOUT rsp, '* Creates both a printer queue and a desktop object for this printer.'
-    CALL LINEOUT rsp, '*'
-    CALL LINEOUT rsp, 'ADDQUEUE'
-    CALL LINEOUT rsp, '    NAME       =' queuename
-    CALL LINEOUT rsp, '    COMMENT    =' printername
-    CALL LINEOUT rsp, '    DRIVERNAME =' driver'.'model
-    CALL LINEOUT rsp, '    PORT       =' portname
-    CALL LINEOUT rsp, '    DEFINEQUEUEPROPS'
-    CALL LINEOUT rsp, '        FORMNAME    =' page
-    CALL LINEOUT rsp, '        ORIENTATION =' o9n
-    CALL LINEOUT rsp, '    ENDQUEUEPROPS'
-    CALL LINEOUT rsp, 'ENDQUEUE'
     CALL LINEOUT rsp
 RETURN 1
 

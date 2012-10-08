@@ -100,6 +100,14 @@ __VXREXX____APPENDS__:
 #append ..\..\Shared\PrintUtl.VRS
 */
 return
+/*:VRX         CHK_CREATEPM_Click
+*/
+CHK_CREATEPM_Click: PROCEDURE
+    set = VRGet( "CHK_CREATEPM", "Set" )
+    CALL VRSet 'DT_PRESDRV',   'Enabled', set
+    CALL VRSet 'DDCB_PRESDRV', 'Enabled', set
+RETURN
+
 /*:VRX         ConfirmAndCreate
 */
 ConfirmAndCreate: PROCEDURE EXPOSE globals.
@@ -151,9 +159,13 @@ CreateCupsPrinter: PROCEDURE EXPOSE globals.
         cups_cmd = cups_cmd '-L "'globals.!prt_loc'"'
     IF globals.!prt_dev <> '' THEN
         cups_cmd = cups_cmd '-v "'globals.!prt_port'" -m' globals.!prt_dev
-    ELSE
-        cups_cmd = cups_cmd '-v "'globals.!prt_port'" -m "'globals.!prt_ppd'"'
-
+    ELSE IF globals.!mode == 2 THEN 
+        cups_cmd = cups_cmd '-v "'globals.!prt_port'" -P "'globals.!prt_ppd'"'
+    ELSE DO
+        PARSE VAR globals.!prt_ppd (globals.!cupsdir)'\share\cups\model\' model
+        IF model == '' THEN model = globals.!prt_ppd
+        cups_cmd = cups_cmd '-v "'globals.!prt_port'" -m "'model'"'
+    END
 
     CALL LINEOUT globals.!log1, 'Creating CUPS printer using:'
     CALL LINEOUT globals.!log1, '   ' cups_cmd
@@ -214,7 +226,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
          */
         use_src  = VRParseFilePath( driver_path, 'DP')
         use_desc = use_src'\PRDESC.LST'
-        CALL CreateDriverList driver_path'\'prnt_drv'.DRV', use_desc
+        CALL CreateDriverList driver_path, use_desc
     END
     ELSE DO
         /* Driver is not in the repository.  Try to grab the installed files
@@ -247,15 +259,23 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     rsp_file = globals.!tmpdir'\printer.rsp'
     CALL RSPCreatePrinter rsp_file, prnt_drv, printer_model,,
                           port_name, queue_name, printer_title
-    result = ExecRINSTPRN( use_desc, use_drv, use_src, rsp_file )
 
+    /* Install the printer driver.  (We do this manually because doing it
+     * through RINSTPRN seems not to work properly on some systems.)
+     */
+    result = InstallPrintDriver( prnt_drv, driver_path, printer_model )
+    IF result == 0 THEN CALL RSPInstallDriver rsp_file, prnt_drv, printer_model
+
+    /* Now call RINSTPRN to create the printer queue/device and object. 
+     */
+    result = ExecRINSTPRN( use_desc, use_drv, use_src, rsp_file )
     IF result <> 0 THEN
         CALL DeletePort port_name
     ELSE IF port_ok == 1 THEN DO
         CALL VRMessage VRWindow(),
                        'The installed version of CUPS.PDR appears to be out of ',
                        'date.  As a result, the desktop printer will not be ',
-                       'useable until the desktop is restarted.',,
+                       'usable until the desktop is restarted.',,
                        'Port Driver Problem', 'W'
     END
 
@@ -314,34 +334,45 @@ RETURN 0
 */
 DDCB_PROTOCOL_Change: PROCEDURE
 
-    which = VRGet('DDCB_PROTOCOL', 'Selected')
+    idx = VRGet('DDCB_PROTOCOL', 'Selected')
+    which = VRMethod('DDCB_PROTOCOL', 'GetItemData', idx )
     SELECT
         WHEN which == 1 THEN DO     /* IPP */
             show_queue = 1
             show_user  = 1
             show_pass  = 1
+            CALL VRSet 'DT_SERVER',  'Caption', 'Printer or server address:'
+            CALL VRSet 'DT_QUEUE',   'Caption', 'Printer queue name:'
+            CALL VRSet 'DT_USERID',  'Caption', 'User ID:'
         END
         WHEN which == 2 THEN DO     /* SOCKET */
             show_queue = 0
             show_user  = 0
             show_pass  = 0
+            CALL VRSet 'DT_SERVER',  'Caption', 'Printer or server address:'
         END
         WHEN which == 3 THEN DO     /* LPD */
             show_queue = 1
             show_user  = 1
             show_pass  = 0
-            /* CALL VRSet 'DT_USERID', 'Caption', 'User ID (if required):' */
+            CALL VRSet 'DT_SERVER',  'Caption', 'Printer or server address:'
+            CALL VRSet 'DT_QUEUE',   'Caption', 'Printer queue name:'
+            CALL VRSet 'DT_USERID',  'Caption', 'User ID (if required):'
         END
         WHEN which == 4 THEN DO     /* SMB */
             show_queue = 1
             show_user  = 1
             show_pass  = 1
-            /* CALL VRSet 'DT_QUEUE', 'Caption', 'Shared printer name:' */
+            CALL VRSet 'DT_SERVER',  'Caption', 'Print server name:'
+            CALL VRSet 'DT_QUEUE',  'Caption', 'Shared printer name:'
+            CALL VRSet 'DT_USERID', 'Caption', 'User ID:'
         END
         OTHERWISE DO                /* CUPS */
             show_queue = 1
             show_user  = 0
             show_pass  = 0
+            CALL VRSet 'DT_SERVER',  'Caption', 'CUPS server name:'
+            CALL VRSet 'DT_QUEUE',  'Caption',  'CUPS printer name:'
         END
     END
 
@@ -389,14 +420,29 @@ return 0
 GetCupsPorts: PROCEDURE EXPOSE globals.
 
     CALL VRSet 'DT_INFO', 'Caption', 'Looking for connected printers.  Please wait...'
-    CALL VRMethod 'LB_SELECT', 'Clear'
 
     lpinfo_cmd = globals.!cupsdir'\sbin\lpinfo.exe -v |rxqueue'
+    snmp_cmd   = globals.!cupsdir'\lib\cups\backend\snmp.exe |rxqueue'
 
     _od = DIRECTORY()
     CALL DIRECTORY globals.!cupsdir
     listqueue = RXQUEUE('CREATE')
     defqueue  = RXQUEUE('SET', listqueue )
+
+    /* Use the SNMP backend to find network printers.  We do this in addition 
+     * to lpinfo because SNMP may provide the actual printer name.  We'll 
+     * merge this with the output of lpinfo in the next step.
+     */
+    ADDRESS CMD '@' snmp_cmd listqueue
+    DO QUEUED()
+        PARSE PULL line
+        PARSE VAR line _type _uri '"'_identifier'"' .
+        _uri = STRIP( _uri )
+        _type = STRIP( _type )
+        IF _uri == '' THEN ITERATE
+        IF _type <> 'network' THEN ITERATE
+        netnames._uri = _identifier
+    END
 
     ADDRESS CMD '@' lpinfo_cmd listqueue
     i = 0
@@ -409,12 +455,15 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
             IF _protocol == 'socket' THEN _protocol = 'AppSocket'
             ELSE _protocol = TRANSLATE( _protocol )
             i = i + 1
-            IF _queue == '' THEN _desc = '('_protocol')'
-            ELSE _desc = _queue '('_protocol')'
-            devices.i = 'Detected network printer' _desc 'at' _host
+            IF _queue <> '' THEN _queue = '(queue '_queue')'
+            IF SYMBOL('netnames._name') == 'VAR' THEN 
+                devices.i = 'Detected network printer ('_protocol') "'netnames._name'" at' _host _queue
+            ELSE
+                devices.i = 'Detected network printer ('_protocol') at' _host _queue
         END
         ELSE IF _type <> 'direct' THEN ITERATE
         ELSE DO
+            IF _name == 'hp' THEN ITERATE
             i = i + 1
             devices.i = 'Local printer:' _name
         END
@@ -442,7 +491,7 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
 
     CALL VRSet 'DT_INFO', 'Caption', 'Getting list of supported printers.  Please wait...'
 
-    lpinfo_cmd = globals.!cupsdir'\sbin\lpinfo.exe --exclude-schemes drv -m |rxqueue'
+    lpinfo_cmd = globals.!cupsdir'\sbin\lpinfo.exe --exclude-schemes drv -m 2>&1 |rxqueue'
 
     _od = DIRECTORY()
     CALL DIRECTORY globals.!cupsdir
@@ -503,6 +552,13 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
 
     DO i = 1 TO models.0
         PARSE VAR models.i _brand _model ' - CUPS+' _type
+        IF _type == '' THEN DO
+            PARSE VAR models.i _brand _model ',' _type
+            IF WORD( _type, 1 ) == 'hpcups' THEN
+                _type = 'HPLIP' /* SUBWORD( _type, 2 ) */
+            ELSE IF ( _type == '') & ( LEFT( ppds.i, 3 ) == 'hp/') THEN
+                _type = 'HPLIP'
+        END
         man = WORDPOS( _brand, makers )
         IF man == 0 THEN ITERATE
 
@@ -517,23 +573,23 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
              * and alternate drivers; if one if them is 'Simplified', make that
              * the regular driver by preference.
              */
-            IF ( manufacturers.man.!printers.count.!model == _model ) & ,
-               ( manufacturers.man.!printers.count.!type  == _version ) THEN
-            DO
-                IF ( WORD( _version, 1 ) == 'Gutenprint') & ( _flag == 'Simplified') THEN DO
-                    manufacturers.man.!printers.count.!driver2 = manufacturers.man.!printers.count.!driver
-                    manufacturers.man.!printers.count.!remark2 = manufacturers.man.!printers.count.!remark
-                    manufacturers.man.!printers.count.!driver  = ppds.i
-                    manufacturers.man.!printers.count.!remark  = 'Simplified'
+            IF ( TRANSLATE( manufacturers.man.!printers.count.!model ) == TRANSLATE( _model )) THEN DO
+                IF ( manufacturers.man.!printers.count.!type == _version ) THEN DO
+                    IF ( WORD( _version, 1 ) == 'Gutenprint') & ( _flag == 'Simplified') THEN DO
+                        manufacturers.man.!printers.count.!driver2 = manufacturers.man.!printers.count.!driver
+                        manufacturers.man.!printers.count.!remark2 = manufacturers.man.!printers.count.!remark
+                        manufacturers.man.!printers.count.!driver  = ppds.i
+                        manufacturers.man.!printers.count.!remark  = 'Simplified'
+                    END
+                    ELSE DO
+                        manufacturers.man.!printers.count.!driver2 = ppds.i
+                        IF _flag == 'Simplified' THEN
+                            manufacturers.man.!printers.count.!remark2 = 'Simplified'
+                        ELSE
+                            manufacturers.man.!printers.count.!remark2 = ''
+                    END
+                    ITERATE
                 END
-                ELSE DO
-                    manufacturers.man.!printers.count.!driver2 = ppds.i
-                    IF _flag == 'Simplified' THEN
-                        manufacturers.man.!printers.count.!remark2 = 'Simplified'
-                    ELSE
-                        manufacturers.man.!printers.count.!remark2 = ''
-                END
-                ITERATE
             END
         END
         count = count + 1
@@ -573,7 +629,7 @@ return
 /*:VRX         ImportPPD
 */
 ImportPPD: PROCEDURE EXPOSE globals.
-    /* Import a new PPD file into a PostScript PrinterPak driver.
+    /* Import a new PPD file into a PostScript driver.
      */
     ARG driver, ppdfile
     IF driver == '' THEN driver = 'PSCRIPT'
@@ -776,10 +832,12 @@ ImportPPD: PROCEDURE EXPOSE globals.
         RETURN 5                        /** RC=5  PPD import failed **/
     END
 
-    IF mustcopy == 0 THEN DO
+    /*IF mustcopy == 0 THEN DO*/
+    IF pmdx <> '' THEN DO
         /* If we're working out of the repository, we need to update the
          * driver table in PRDESC.LST to add the new driver(s).
          */
+
         CALL LINEOUT globals.!log1, 'Updating' globals.!prdesc 'with' newprinters.0 'new entries ...'
         count = 0
         match_drv = '('driver'.DRV)'
@@ -870,10 +928,19 @@ Init:
     IF InitArgs.0 > 0 THEN globals.!cupsdir = InitArgs.1
 
     IF \VRIsDir( globals.!cupsdir ) THEN DO
-        CALL VRMessage VRWindow(), 'Please specify the path where CUPS is installed as follows:' ||,
-                                   '0d0a0d0a'x || 'CUPSWIZ <cups-path>',,
-                                   'Unknown or Invalid CUPS Path', 'E'
-        EXIT
+        IF TRANSLATE( globals.!cupsdir ) <> '/R' THEN
+            CALL VRMessage VRWindow(),,
+                           'CUPS could not be located.  If you wish to use ' ||,
+                           'a local installation of CUPS, please specify '   ||,
+                           'the path where CUPS is installed on the command '||,
+                           'line to this program (e.g "CUPSWIZ F:\CUPS").'   ||,
+                           '0d0a0d0a'x ||,
+                           'Only remote CUPS queues will be available for '  ||,
+                           'printers created in this session.  (To skip '    ||,
+                           'this message in the future, start this program ' ||,
+                           'with the /R parameter.)',,
+                           'CUPS Path Not Found or Not Valid', 'E'
+        globals.!cupsdir = ''
     END
 
     /* Delete the error log file each time the program starts.
@@ -952,6 +1019,7 @@ say '---'
     CALL VRMethod 'LB_SELECT', 'Clear'
     CALL VRMethod 'LB_SELECT', 'AddStringList', 'models.',, 'ppds.'
     CALL VRSet    'LB_SELECT', 'Painting', 1
+/*    CALL VRSet 'LB_SELECT', 'Selected', 1 */
 
 RETURN
 
@@ -967,25 +1035,28 @@ LB_SELECT_Click: PROCEDURE EXPOSE globals. manufacturers.
             selected = VRGet('LB_SELECT', 'Selected')
             IF selected == 0 THEN RETURN
             which = VRMethod('LB_SELECT', 'GetItemData', selected )
-            IF which == '' THEN RETURN
-            man = VRMethod('LB_BRAND', 'GetItemData', brand )
-            IF man == '' THEN RETURN
-
-            make  = manufacturers.man.!name
-            model = manufacturers.man.!printers.which.!model
-            driver = manufacturers.man.!printers.which.!type
-            remark = manufacturers.man.!printers.which.!remark
-            IF remark == '' THEN 
-                type = ' ('driver')'
-            ELSE
-                type = ' ('driver' - 'remark')'
-
-            CALL VRSet 'WN_MAIN', 'StatusText', make model type
+            IF which <> '' THEN DO
+                man = VRMethod('LB_BRAND', 'GetItemData', brand )
+                IF man == '' THEN RETURN
+                make  = manufacturers.man.!name
+                model = manufacturers.man.!printers.which.!model
+                driver = manufacturers.man.!printers.which.!type
+                IF WORD( driver, 1 ) == 'hpcups' THEN driver = 'HPLIP'
+                remark = manufacturers.man.!printers.which.!remark
+                IF driver == '' THEN
+                    type = ''
+                ELSE IF remark == '' THEN 
+                    type = ' ('driver')'
+                ELSE
+                    type = ' ('driver' - 'remark')'
+                CALL VRSet 'WN_MAIN', 'StatusText', make model type
+            END
         END
 
         OTHERWISE NOP
     END
 
+    CALL VRSet 'PB_NEXT', 'Enabled', 1
 RETURN
 
 /*:VRX         LoadSettings
@@ -998,11 +1069,12 @@ LoadSettings: PROCEDURE EXPOSE globals.
 
     /* Get CUPS paths.
      */
-    globals.!cupsdir = ''
-    cupsdrv = VRParseFilePath( me, 'D')
-    cupsdir = cupsdrv':\cups'
-
-    globals.!cupsdir = cupsdir
+    PARSE VALUE VRGetIni('eCups', 'CUPS', 'USER') WITH cupsdrv '00'x
+    IF cupsdrv == '' THEN
+        cupsdrv = VRParseFilePath( me, 'D') || ':'
+    ELSE
+        cupsdrv = STRIP( cupsdrv, 'T', '\')
+    globals.!cupsdir = cupsdrv'\cups'
 
     /* Get system paths.
      */
@@ -1111,7 +1183,9 @@ RETURN
 /*:VRX         PB_NETOK_Click
 */
 PB_NETOK_Click: PROCEDURE EXPOSE globals. port
-    which  = VRGet('DDCB_PROTOCOL', 'Selected')
+
+    idx = VRGet('DDCB_PROTOCOL', 'Selected')
+    which = VRMethod('DDCB_PROTOCOL', 'GetItemData', idx )
     server = STRIP( VRGet("EF_SERVER",   "Value"))
     pqueue = STRIP( VRGet("EF_QUEUE",    "Value"))
     userid = STRIP( VRGet("EF_USERID",   "Value"))
@@ -1192,6 +1266,11 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
                 globals.!prt_ppd  = ppd
                 globals.!prt_dev  = ''
                 globals.!prt_nick = GetNameFromPPD( ppd )
+                IF globals.!prt_nick == '' THEN DO
+                    CALL VRMessage VRWindow(), 'Could not read printer name '||,
+                                               'from' ppd'.', 'Invalid PPD', 'E'
+                    RETURN
+                END
             END
             ELSE DO
                 man = VRMethod('LB_BRAND', 'GetItemData', brand )
@@ -1215,7 +1294,7 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
                 ELSE DO
                     globals.!prt_ppd  = TRANSLATE( globals.!cupsdir'/share/cups/model/'ppd, '\', '/')
                     globals.!prt_dev  = ''
-                    globals.!prt_nick = GetNameFromPPD( ppd )
+                    globals.!prt_nick = GetNameFromPPD( globals.!prt_ppd )
                 END
             END
             globals.!remotecups = ''
@@ -1344,6 +1423,7 @@ return
 */
 SetPage1: PROCEDURE EXPOSE globals. manufacturers.
 
+    CALL VRSet 'PB_NEXT',  'Enabled', 0
     CALL VRSet 'LB_BRAND', 'Visible', 1
 
     /* Resize LB_SELECT if necessary to make room for LB_BRAND */
@@ -1355,13 +1435,35 @@ SetPage1: PROCEDURE EXPOSE globals. manufacturers.
     CALL VRSet 'LB_SELECT', 'Visible', 1
     CALL VRSet 'GB_INFO',   'Visible', 0
 
-    globals.!page = 1
-    CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
-    CALL GetCupsPrinters
+    globals.!page       = 1
+    globals.!prt_ppd    = ''
+    globals.!prt_dev    = ''
+    globals.!prt_nick   = ''
+    globals.!prt_port   = ''
+    globals.!remotecups = ''
+    globals.!prt_name   = ''
+    globals.!prt_loc    = ''
+    globals.!prt_info   = ''
+    globals.!os2driver  = ''
 
+    CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
     CALL VRSet 'DT_INFO', 'Caption', 'Select your printer model.'
 
     /* Populate the manufacturer list */
+    IF globals.!cupsdir == '' THEN DO
+        manufacturers.1.!name = '-- Custom --'
+        manufacturers.1.!printers.0 = 1
+        manufacturers.1.!printers.1.!model   = '-- Other printer (requires PPD) --'
+        manufacturers.1.!printers.1.!driver  = ''
+        manufacturers.1.!printers.1.!type    = ''
+        manufacturers.1.!printers.1.!remark  = '-- Other printer (requires PPD) --'
+        manufacturers.1.!printers.1.!driver2 = ''
+        manufacturers.1.!printers.1.!remark2 = ''
+        manufacturers.0 = 1
+    END
+    ELSE 
+        CALL GetCupsPrinters
+
     CALL VRSet 'LB_BRAND',  'Painting', 0
     DO i = 1 TO manufacturers.0
         addman.i = manufacturers.i.!name
@@ -1372,7 +1474,8 @@ SetPage1: PROCEDURE EXPOSE globals. manufacturers.
     CALL VRMethod 'LB_BRAND', 'AddStringList', 'addman.',, 'addidx.'
     CALL VRSet 'LB_BRAND',  'Painting', 1
 
-    CALL VRMethod 'LB_SELECT', 'SetFocus'
+    CALL VRMethod 'LB_BRAND', 'SetFocus'
+    CALL VRSet 'LB_BRAND', 'Selected', 1
     CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
 
 RETURN
@@ -1383,6 +1486,7 @@ SetPage2: PROCEDURE EXPOSE globals.
 
     globals.!page = 2
     CALL VRSet 'LB_BRAND', 'Visible', 0
+    CALL VRSet 'PB_NEXT',  'Enabled', 0
     CALL VRSet 'WN_MAIN', 'StatusText', 'Selected printer: ' globals.!prt_nick 
 
     /* Resize LB_SELECT to the full width of GB_INFO */
@@ -1391,8 +1495,15 @@ SetPage2: PROCEDURE EXPOSE globals.
     CALL VRSet 'LB_SELECT', 'Left', lb_x
     CALL VRSet 'LB_SELECT', 'Width', lb_w
 
+    CALL VRMethod 'LB_SELECT', 'Clear'
+
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
-    CALL GetCupsPorts
+    IF globals.!cupsdir == '' THEN DO
+        CALL VRMethod 'LB_SELECT', 'AddString', 'Network printer (manual configuration)',, ''
+        CALL VRSet    'LB_SELECT', 'Selected', 1
+    END
+    ELSE
+        CALL GetCupsPorts
     CALL VRMethod 'LB_SELECT', 'SetFocus'
     CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
 
@@ -1618,6 +1729,28 @@ return
 */
 SW_NETWORK_Init:
 
+    IF globals.!cupsdir == '' THEN DO
+        protos.0 = 1
+        protos.1 = 'Existing CUPS printer (remote server)'
+        pnums.0 = 1
+        pnums.1 = 5
+    END
+    ELSE DO
+        protos.0 = 5
+        protos.1 = 'Internet Printing Protocol (IPP)'
+        protos.2 = 'AppSocket/JetDirect'
+        protos.3 = 'Line Printer Remote daemon (LPD)'
+        protos.4 = 'Windows/SMB network'
+        protos.5 = 'Existing CUPS printer'
+        pnums.0 = 5
+        pnums.1 = 1
+        pnums.2 = 2
+        pnums.3 = 3
+        pnums.4 = 4
+        pnums.5 = 5
+    END
+
+    CALL VRMethod 'DDCB_PROTOCOL', 'AddStringList', 'protos.',, 'pnums.'
     CALL VRSet 'DDCB_PROTOCOL', 'Selected', 1
 
     window = VRInfo( "Object" )
