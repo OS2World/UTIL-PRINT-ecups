@@ -1,38 +1,76 @@
-CUPSWIZ - prototype CUPS printer-creation wizard
+CUPSWIZ - CUPS printer-creation wizard
 Version 0.95
 
-Make sure cupsport.exe is either in the current directory or in the PATH.
 
-Usage: cupswiz <path-to-cups>
-(e.g. "cupswiz f:\cups")
+REQUIREMENTS
 
-<path-to-cups> can be omitted if cupswiz.exe is on the same drive as CUPS, or 
-if OS2.INI defines the CUPS path in the key "eCups" -> "CUPS".
+   CUPS (that is, a full, functioning CUPS server) must be installed and 
+   running, either on the same computer or a remote server on your network.
 
-Requirements:
- - CUPS, including ECUPS.DRV and CUPS.PDR, must be installed and working. 
-   The CUPS daemon must be running.  
- - CUPS.PDR should have a bldlevel of 1.03 (February 2011) or later.  If not,
-   the created WPS printer object will not work properly until you reboot 
-   (possibly restarting the WPS will also work, but I'm not sure about that).
- - GNU gzip.exe must be installed (somewhere on the PATH).
- - RINSTPRN.EXE (included with OS/2 MCP/ACP & eComStation, not sure about
-   earlier versions) must also be somewhere on the PATH.
- - VROBJ.DLL (included in eComStation or available on Hobbes) is required.
+   At least one of the following CUPS-compatible OS/2 printer presentation
+   ("PrinterPak") drivers must be installed: 
+     - ECUPS.DRV     (eCups driver for Gutenprint and other filter packages)
+     - ECUPS-HP.DRV  (eCups driver for HPLIP) 
+     - PSPRINT.DRV   (Enhanced OS/2 Postscript driver replacement)
 
-Current limitations: 
- - The CUPS printer is always created with default job options.
- - There is no way to go 'back'; if you need to go back and change a previous
-   selection, you must cancel and start over.
- - The program has only been tested with Gutenprint, HPLIP, and (to a limited
-   extent) foomatic-rip based printers.  Other drivers packages such as SpliX
-   or foo2qpdl may work but this is not guaranteed.
- - If your %TMP% directory has spaces in the pathname, the program will almost
-   certainly fail to work properly.  The same applies to your %LOGFILES%
-   directory.
- - No internationalization support (yet).
- - No help or documentation.
- - Probably still has bugs due to my limited testing capabilities.
+   CUPS.PDR (the eCups port driver) must be installed.  In addition, it 
+   should have a bldlevel of 1.03 (February 2011) or later.  (With earlier
+   versions, you will be required to restart the WPS after creating a 
+   printer.)
 
+   (If you installed CUPS on your system from WarpIN packages, all of the
+   above requirements should be fulfilled.)
+
+   Other required files (all included out of the box with eComStation;
+   other versions of OS/2 may or may not have them installed):
+     - RINSTPRN.EXE (OS/2 printer CID installer, usually located in \OS2)
+     - VROBJ.DLL (VX-REXX standard runtime; must be in the LIBPATH)
+     - GZIP.EXE (GNU gzip; must be on the PATH)
+
+
+INSTALLATION
+
+  1. Place CUPSWIZ.EXE into a suitable directory.  
+  2. Place CUPSPORT.EXE either in the same directory as CUPSWIZ.EXE, or else
+     in a directory on the PATH.
+
+
+USAGE
+
+  cupswiz [ <path-to-cups> | /R ]
+
+  Where <path-to-cups> is the location of the top-level directory in which
+  CUPS is installed on your system (if you are using a local CUPS server).
+  This can be omitted if CUPSWIZ.EXE resides on the same drive as CUPS, or 
+  if OS2.INI defines the CUPS path in the key "eCups" -> "CUPS".  If CUPS
+  cannot be located, a warning popup will be displayed and the program will
+  proceed as though the /R option was used.
+
+  The /R option indicates that a WPS printer object is to be created for an
+  already-existing printer queue on a remote CUPS server.  In this case, CUPS
+  does not need to be installed locally, but you will need to provide a CUPS-
+  specific PPD file for the printer in question.  
+
+  Only one of the above parameters can be specified.  
+
+  You may wish to create a program object which calls CUPSWIZ.EXE with the
+  appropriate parameter.
+
+
+LIMITATIONS & KNOWN PROBLEMS
+
+  - There is no way to go 'back' in the wizard; if you need to go back and
+    change a previous selection, you must cancel and start over.
+  - The program has only been tested with Gutenprint, HPLIP, and (to a limited
+    extent) foomatic-rip based printers.  Other drivers packages such as SpliX
+    or foo2qpdl may work but this is not guaranteed.
+  - If your %TMP% directory has spaces in the pathname, the program will almost
+    certainly fail to work properly.  The same applies to your %LOGFILES%
+    directory.
+  - The CUPS printer is always created with default job options.  If you want
+    to change them, you will have to do so from the CUPS administration GUI.
+  - This program is currently available in English only.
+  - There is no help or documentation.
+  - There may well be undiscovered bugs; please report any you find.
 
 Contact: Alex Taylor (alex at altsan dot org)
