@@ -299,7 +299,7 @@ CreatePrinter: PROCEDURE EXPOSE globals.
     END
 
     /* Now create the OS/2 printer object */
-    IF create_os2 == 1 THEN DO
+    IF create_os2 == 1 & globals.!os2driver <> '' THEN DO
 
         /* Make sure the presentation driver supports the printer */
         IF globals.!mode == 2 THEN DO
@@ -1643,7 +1643,13 @@ SW_CREATE_Init:
         END
         CALL VRSet 'DDCB_PRESDRV', 'Selected', def_idx
     END
+    ELSE DO
+        CALL VRMessage VRWindow(), 'No eCups-compatible OS/2 presentation drivers are installed.',
+                       '0d0a0d0a'x || 'Please install the ECUPS or ECUPS-HP printer driver before continuing.',,
+                       'Missing PM Driver', 'E'
+        CALL VRSet 'PB_CREATEOK', 'Enabled', 0
     /* TODO give an error if no drivers were found */
+    END
 
     window = VRInfo( "Object" )
     if( \VRIsChildOf( window, "Notebook" ) ) then do
@@ -1687,7 +1693,7 @@ SW_MODEL_Init:
      */
     ok = VRMethod( "LB_OS2MODELS", "AddStringList", "models.",  )
     IF best > 0 THEN
-        CALL VRSet 'LP_OS2MODELS', 'Selected', best
+        CALL VRSet 'LB_OS2MODELS', 'Selected', best
 
     CALL VRSet 'DT_MODEL1', 'Caption',,
                'The printer "'globals.!prt_nick'" could not be found in the'  ,
