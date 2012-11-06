@@ -201,53 +201,27 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     printer_model = globals.!prt_nick
     queue_name    = GetQueueName( printer_title )
     port_name     = GetNextPortName('CUPS')
-    use_drv       = globals.!prdrv
 
-    /* Determine the source directories/files to pass to RINSTPRN.EXE.  (Some
-     * of this logic is repeated from ImportPPD, but we have to do it again
-     * here because (a) we might not have gone through ImportPPD to get to this
-     * point, and (b) even if we did, the repository information might have
-     * changed.)
+    /* Determine the printer driver source directories/files.  Yes, this is
+     * repeated from ImportPPD, but we have to do it again here because 
+     * (a) we might not have gone through ImportPPD to get to this point, and
+     * (b) even if we did, the repository information might have changed.
      */
-    copied_driver = 0
     driver_path = GetDriverSource( prnt_drv )
-
-    IF ( pmdx <> '') & ( globals.!prdrv <> '') & ( globals.!prdesc <> '') THEN DO
-        /* Printer driver is in the local repository, so we can just point
-         * to that, and use the system PRDESC.LST file.
+    IF driver_path == '' THEN
+        /* Driver was not found in the repository.  Check for a previously-
+         * installed copy under \OS2\DLL.
          */
-        use_desc = globals.!prdesc
-        use_src  = globals.!repository
-    END
-    ELSE IF driver_path <> '' THEN DO
-        /* Driver is not in the repository, but was found in another designated
-         * location.  Point to that location, and create a temporary PRDESC.LST
-         * file for it.
-         */
-        use_src  = VRParseFilePath( driver_path, 'DP')
-        use_desc = use_src'\PRDESC.LST'
-        CALL CreateDriverList driver_path, use_desc
-    END
-    ELSE DO
-        /* Driver is not in the repository.  Try to grab the installed files
-         * from under \OS2\DLL, copy them into a temporary working directory,
-         * and create a temporary PRDESC.LST file.
-         */
-        driver_path = globals.!os2dir'\DLL\'prnt_drv'\'prnt_drv'.DRV'
+        driver_path = STREAM( globals.!os2dir'\DLL\'prnt_drv'\'prnt_drv'.DRV', 'C', 'QUERY EXISTS')
 
-        use_src  = SysTempFileName( globals.!tmpdir'\PDR_????')
-        use_desc = use_src'\PRDESC.LST'
-
-        IF VRMkDir( use_src ) == 0 THEN DO
-            CALL LINEOUT globals.!log1, 'Failed to create working directory' use_src':' VRError()
-            RETURN 1
-        END
-        IF CopyDriverToSource( driver_path, use_src ) == 0 THEN DO
-            CALL LINEOUT globals.!log1, 'Failed to copy driver' driver_path 'to working directory' use_src'.'
-            RETURN 1
-        END
-        CALL CreateDriverList driver_path, use_desc
-        copied_driver = 1
+    IF driver_path == '' THEN DO
+        /* TODO allow the user to browse for the driver on their system */
+        CALL VRMessage VRWindow(), 'The printer driver' prnt_drv 'could not  ',
+                                   'be located.  If you have the driver      ',
+                                   'files, please copy them to the directory ',
+                                   globals.!os2dir'\DLL\'prnt_drv' and then  ',
+                                   'try again.', 'Driver Not Found', 'E'
+        RETURN 1
     END
 
     /* Create a new CUPS port. */
@@ -256,19 +230,22 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     IF port_ok > 1 THEN
         RETURN 1
 
-    rsp_file = globals.!tmpdir'\printer.rsp'
-    CALL RSPCreatePrinter rsp_file, prnt_drv, printer_model,,
-                          port_name, queue_name, printer_title
-
-    /* Install the printer driver.  (We do this manually because doing it
-     * through RINSTPRN seems not to work properly on some systems.)
+    /* New logic to create the printer ourselves (instead of using RINSTPRN).
+     * There are two necessary steps: make sure the driver is installed, and 
+     * then create the printer object (which causes the underlying device and
+     * queue to be created automatically as well).
      */
+
     result = InstallPrintDriver( prnt_drv, driver_path, printer_model )
-    IF result == 0 THEN CALL RSPInstallDriver rsp_file, prnt_drv, printer_model
+    CALL LINEOUT globals.!log1, 'InstallPrintDriver(' prnt_drv',' driver_path',' printer_model ') RC =' result
 
-    /* Now call RINSTPRN to create the printer queue/device and object. 
-     */
-    result = ExecRINSTPRN( use_desc, use_drv, use_src, rsp_file )
+    IF result == 0 THEN 
+        result = CreatePrinterObject( prnt_drv, printer_model,,
+                                      port_name, queue_name, printer_title )
+    CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv',' printer_model,
+                                ',' port_name',' queue_name',' printer_title,
+                                ') RC =' result
+
     IF result <> 0 THEN
         CALL DeletePort port_name
     ELSE IF port_ok == 1 THEN DO
@@ -277,11 +254,6 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
                        'date.  As a result, the desktop printer will not be ',
                        'usable until the desktop is restarted.',,
                        'Port Driver Problem', 'W'
-    END
-
-    IF copied_driver == 1 THEN DO
-        CALL VRDeleteFile use_src'\*'
-        CALL VRRmDir use_src
     END
 
 RETURN result
@@ -312,10 +284,13 @@ CreatePrinter: PROCEDURE EXPOSE globals.
             END
         END
         ELSE IF PrinterExistsInDRV( globals.!os2driver, globals.!prt_nick ) == 0 THEN DO
-            IF globals.!prt_ppd == '' THEN
+            cups_ppd = globals.!prt_ppd
+            IF cups_ppd == '' THEN
+                cups_ppd = STREAM( globals.!cupsdir'\etc\cups\ppd'globals.!prt_name'.ppd', 'C', 'QUERY EXISTS')
+            IF cups_ppd == '' THEN
                 CALL PromptForPMName
             ELSE DO
-                ok = ImportPPD(globals.!os2driver, globals.!prt_ppd )
+                ok = ImportPPD(globals.!os2driver, cups_ppd )
                 IF ok <> 0 THEN DO
                     CALL LINEOUT globals.!log1, 'PPD import failed:' ok
                     RETURN 1                /** RC=1  PPD import failed **/
@@ -617,6 +592,8 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
     manufacturers.count.!printers.1.!driver2 = ''
     manufacturers.count.!printers.1.!remark2 = ''
     manufacturers.0 = count
+
+    CALL VRSet 'DT_INFO', 'Caption', 'Select the printer manufacturer and model from the list below.'
 
 RETURN
 
@@ -1402,7 +1379,7 @@ PromptForPMName: PROCEDURE EXPOSE globals. models. best
                        'be supported by the' globals.!os2driver 'driver, and' ,
                        'no similar models were found.  The generic PostScript',
                        'driver will be used for application support.',,
-                       'Printer Name Not Found', 'E'
+                       'Printer Name Not Found', 'W'
         globals.!prt_nick = 'Generic PostScript Printer'
         RETURN
     END
@@ -1447,7 +1424,6 @@ SetPage1: PROCEDURE EXPOSE globals. manufacturers.
     globals.!os2driver  = ''
 
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
-    CALL VRSet 'DT_INFO', 'Caption', 'Select your printer model.'
 
     /* Populate the manufacturer list */
     IF globals.!cupsdir == '' THEN DO
