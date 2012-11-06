@@ -1,5 +1,45 @@
 CUPSWIZ - CUPS printer-creation wizard
-Version 0.95
+Version 0.96
+
+  This program is simple graphical front-end for creating CUPS-based printers
+  under OS/2.
+
+  Without this program, creating a CUPS printer under OS/2 is something of a
+  headache.  First, you need to go into the CUPS web GUI and go through its
+  (often agonizingly slow) creation wizard.  Then you need to make sure support
+  for your printer has been imported into the OS/2 CUPS printer driver (which
+  may require you to manually prep and then import a PPD file yourself).  Then
+  you have to create a new OS/2 CUPS port and point it to the CUPS queue you
+  created earlier.  Finally, you have to create an actual OS/2 printer object
+  for your applications to print to.  This may be fine for a few expert users,
+  but the average person just wants to create a printer quickly and simply.
+
+  This program attempts to automate most of these steps.  The basic idea is 
+  that you select your printer make/model from the list of those supported 
+  (which will depend on your installed CUPS setup), or import a special CUPS
+  PPD file which defines your printer, indicate how the printer is connected
+  (whether via USB or one of a number of types of network connection), give
+  it a name and description, and the program does the rest.
+
+  Some of the highlights:
+   - When you create the printer, both the CUPS printer queue and a
+     corresponding OS/2 printer object are created; the CUPS port linking
+     the two is also created and configured automatically.  (You can also
+     opt to only create the CUPS queue if you wish.)
+   - You can also select an existing CUPS printer queue (locally or on a
+     remote server), in which case a corresponding OS/2 printer object will
+     be created for it.
+   - The appropriate model in the OS/2 PM printer driver (ECUPS.DRV or
+     ECUPS-HP.DRV) is automatically identified and installed in the new OS/2
+     printer object.  If an exact match is not found (and no PPD is available
+     - see next point) you will offered a list of similar models, or allowed 
+     to select generic support.
+   - When installing a printer which is not currently defined in the OS/2
+     printer driver, if a PPD exists for the new printer it will be imported
+     automatically.  (If not, you will be prompted as above.)
+
+  As this program is still under development, it is not yet as smooth as it
+  could be.  See the 'Limitations & Known Problems' section below for more.
 
 
 REQUIREMENTS
@@ -23,7 +63,6 @@ REQUIREMENTS
 
    Other required files (all included out of the box with eComStation;
    other versions of OS/2 may or may not have them installed):
-     - RINSTPRN.EXE (OS/2 printer CID installer, usually located in \OS2)
      - VROBJ.DLL (VX-REXX standard runtime; must be in the LIBPATH)
      - GZIP.EXE (GNU gzip; must be on the PATH)
 
@@ -70,7 +109,7 @@ LIMITATIONS & KNOWN PROBLEMS
   - The CUPS printer is always created with default job options.  If you want
     to change them, you will have to do so from the CUPS administration GUI.
   - This program is currently available in English only.
-  - There is no help or documentation.
+  - There is no help.
   - There may well be undiscovered bugs; please report any you find.
 
 Contact: Alex Taylor (alex at altsan dot org)
