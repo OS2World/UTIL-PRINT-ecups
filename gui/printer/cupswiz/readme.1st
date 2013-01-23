@@ -1,5 +1,5 @@
 CUPSWIZ - CUPS printer-creation wizard
-Version 0.96
+Version 0.98
 
   This program is simple graphical front-end for creating CUPS-based printers
   under OS/2.
@@ -108,7 +108,6 @@ LIMITATIONS & KNOWN PROBLEMS
     directory.
   - The CUPS printer is always created with default job options.  If you want
     to change them, you will have to do so from the CUPS administration GUI.
-  - This program is currently available in English only.
   - There is no help.
   - There may well be undiscovered bugs; please report any you find.
 
