@@ -6,7 +6,7 @@ RunParameters:
 RunDirectory: 
 VRXWindow: __VREMainWindow,1,614,2554,5770,9106
 VRXWindow: __VRESectionListWindow,1,675,11804,4529,3891
-VRXWindow: __VREToolsWindow,1,1686,9877,4971,1659
+VRXWindow: __VREToolsWindow,1,1686,9877,4965,1663
 VRXWindow: __VREWindListWindow,1,5228,11804,2650,3891
 UserFile: 1
 UserWindow: WN_MAIN,1

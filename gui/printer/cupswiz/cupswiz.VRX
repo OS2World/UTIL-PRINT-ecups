@@ -137,10 +137,10 @@ ConfirmAndCreate: PROCEDURE EXPOSE globals.
         CALL NLSSetText 'PB_NEXT', 'Caption', 54                            /* 54: Return */
     END
     ELSE DO
-        CALL NLSSetText 'DT_INFO', 'Caption', NLSGetMessage( 51 )           /* 51: The printer has been created. */
-        CALL NLSSetText 'PB_NEXT', 'Caption', NLSGetMessage( 53 )           /* 53: Create another */
+        CALL NLSSetText 'DT_INFO', 'Caption', 51                            /* 51: The printer has been created. */
+        CALL NLSSetText 'PB_NEXT', 'Caption', 53                            /* 53: Create another */
     END
-    CALL NLSSetText 'PB_CANCEL', 'Caption', NLSGetMessage( 55 )             /* 55: Close */
+    CALL NLSSetText 'PB_CANCEL', 'Caption', 55                              /* 55: Close */
 
     CALL LINEOUT globals.!log1, ''
     CALL LINEOUT globals.!log1
@@ -601,8 +601,6 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
     manufacturers.count.!printers.1.!remark2 = ''
     manufacturers.0 = count
 
-    CALL NLSSetText 'DT_INFO', 'Caption', 21                            /* 21: Select the printer manufacturer and model from the list below. */
-
 RETURN
 
 /*:VRX         Halt
@@ -996,10 +994,12 @@ say '---'
     models.0 = manufacturers.item.!printers.0
     ppds.0 = manufacturers.item.!printers.0
 
-    CALL VRSet    'LB_SELECT', 'Painting', 0
+    CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
     CALL VRMethod 'LB_SELECT', 'Clear'
+    CALL VRSet    'LB_SELECT', 'Painting', 0
     CALL VRMethod 'LB_SELECT', 'AddStringList', 'models.',, 'ppds.'
     CALL VRSet    'LB_SELECT', 'Painting', 1
+    CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
 /*    CALL VRSet 'LB_SELECT', 'Selected', 1 */
 
 RETURN
@@ -1505,6 +1505,7 @@ SetPage1: PROCEDURE EXPOSE globals. manufacturers.
             CALL GetCupsPrinters
 
     END
+    CALL NLSSetText 'DT_INFO', 'Caption', 21       /* 21: Select the printer manufacturer and model from the list below. */
 
     CALL VRSet 'LB_BRAND',  'Painting', 0
     DO i = 1 TO manufacturers.0
@@ -1617,8 +1618,8 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.98'                                  /* 12: Version %1 */
-    CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010,2012'                             /* 13: (C) %1 Alex Taylor */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.97'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2012'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
     CALL NLSSetText 'DT_BOOTDRIVE',  'Caption', 14, TRANSLATE( globals.!bootdrv )       /* 14: System boot volume: %1 */ 
