@@ -338,6 +338,26 @@ InstallPrintDriver: PROCEDURE EXPOSE globals.
 RETURN rc
 
 
+/*:VRX         CreatePrinterObject
+*/
+/* Create the specified printer using SysCreateObject (this should create the
+ * queue automatically).
+ */
+CreatePrinterObject: PROCEDURE
+    PARSE ARG driver, model, portname, queuename, printername
+
+    oid = '<WPPO_'queuename'>'
+    setup = 'PORTNAME='portname';PRINTDRIVER='driver'.'model';QUEUENAME='queuename';TAKEDEFAULTS=YES'
+
+    rc = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';OBJECTID='oid';', 'F')
+    IF rc == 1 THEN
+        CALL SysMoveObject oid, '<WP_PRINTERSFOLDER>'
+    ELSE
+        rc = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';', 'F')
+
+RETURN rc
+
+
 /*:VRX         RSPCreatePort
 */
 /* Create/update a RINSTPRN response file to create the specified port.
@@ -592,4 +612,56 @@ QueryAvailableDrivers: PROCEDURE EXPOSE globals. drv_list.
     END
 
 RETURN drv_list.0
+
+/*:VRX         NLSGetMessage
+*/
+/*
+ * Gets the message text associated with the given message number from the
+ * current language file.
+ */
+NLSGetMessage: PROCEDURE EXPOSE globals.
+    PARSE ARG msgnum, .
+    args = ARG()
+
+    msgfile = globals.!messages
+    IF msgnum == '' THEN RETURN ''
+
+    sub_parms = ''
+    DO i = 2 TO args
+        sub_parms = sub_parms', "'ARG( i )'"'
+    END
+
+    INTERPRET 'msgfromfile = SysGetMessage( msgnum, msgfile' sub_parms ')'
+
+    PARSE VAR msgfromfile message '0D'x .
+    IF SUBSTR( message, 1, 4 ) == 'SYS0' THEN message = ''
+
+RETURN message
+
+/*:VRX         NLSSetText
+*/
+/*
+ * Sets the specified property of the specified control to the specified
+ * message text.
+ */
+NLSSetText: PROCEDURE EXPOSE globals.
+    PARSE ARG control, property, message, substitution
+    args = ARG()
+
+    success = 1
+    IF args < 4 THEN
+        text = NLSGetMessage( message )
+    ELSE DO
+        sub_parms = ''
+        DO i = 4 TO args
+            sub_parms = sub_parms '"'|| ARG( i ) ||'",'
+        END
+        sub_parms = STRIP( sub_parms, 'T', ',')
+        INTERPRET 'text = NLSGetMessage( message, 'sub_parms')'
+    END
+
+    IF text == '' THEN success = 0
+    ELSE               CALL VRSet control, property, text
+
+RETURN success
 
