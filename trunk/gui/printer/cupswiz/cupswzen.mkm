@@ -80,7 +80,7 @@ CWZ0063I: The install files for the %1 driver could not be located.  These files
 CWZ0064I: Please enter the directory where the install files will be placed.
 CWZ0065I: CUPS could not be located.  If you wish to use a local installation of CUPS, please specify the path where CUPS is installed on the command line to this program (e.g "%1").
 CWZ0066I: Only remote CUPS queues will be available for printers created in this session.  (To skip this warning in the future, start this program with the /R parameter.)
-CWZ0067I: The printer "%1" does not appear to be supported by the %2 driver, and no similar models were found.  The generic PostScript driver will be used for application support.
+CWZ0067I: The %2 presentation driver appears to contain no information about "%1" or any similar models.  The generic PostScript driver will be used for application support.
 CWZ0068I: Printer Name Not Found
 CWZ0069I: The printer parameters could not be imported, possibly due to an incompatible PPD file.
 CWZ0070I: Error Importing PPD File
