@@ -118,28 +118,29 @@ ConfirmAndCreate: PROCEDURE EXPOSE globals.
 
     CALL SetPage4
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
-    CALL VRSet 'DT_INFO', 'Caption', 'Creating printer...'
+    CALL NLSSetText 'DT_INFO', 'Caption', 50                                /* 50: Creating printer... */
     ok = CreatePrinter( globals.!os2printer )
+
     CALL VRSet 'DT_INFO', 'Caption', ''
     CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
 
     IF ok <> 0 THEN DO
         SELECT
-            WHEN ok == 1 THEN reason = 'Error importing PPD file.'
-            WHEN ok == 2 THEN reason = 'Error creating CUPS printer.  See' globals.!log1 'for more information.'
-            WHEN ok == 3 THEN reason = 'Error creating printer object.  See' globals.!log1 'for more information.'
-            OTHERWISE reason = 'Unknown error.'
+            WHEN ok == 1 THEN reason = NLSGetMessage( 70 )                  /* 70: Error importing PPD file. */
+            WHEN ok == 2 THEN reason = NLSGetMessage( 71, globals.!log1 )   /* 71: Error creating CUPS printer.  See %1 for more information. */
+            WHEN ok == 3 THEN reason = NLSGetMessage( 72, globals.!log1 )   /* 72: Error creating printer object.  See %1 for more information. */
+            OTHERWISE reason = NLSGetMessage( 73)                           /* 73: Unknown error. */
         END
-        CALL VRMessage VRWindow(), 'The following error occurred when trying to create the printer:' ||,
-                       '0d0a0d0a'x || reason, 'Error Creating Printer', 'E'
-        CALL VRSet 'DT_INFO', 'Caption', 'The printer could not be created.'
-        CALL VRSet 'PB_NEXT',   'Caption', 'Return'
+        CALL VRMessage VRWindow(), NLSGetMessage( 60 ) ||,                  /* 60: The following error occurred when trying to create the printer: */
+                       '0d0a0d0a'x || reason, NLSGetMessage( 56 ), 'E'      /* 56: Error Creating Printer */
+        CALL NLSSetText 'DT_INFO', 'Caption', 52                            /* 52: The printer could not be created. */
+        CALL NLSSetText 'PB_NEXT', 'Caption', 54                            /* 54: Return */
     END
     ELSE DO
-        CALL VRSet 'DT_INFO',   'Caption', 'The printer has been created.'
-        CALL VRSet 'PB_NEXT',   'Caption', 'Create another'
+        CALL NLSSetText 'DT_INFO', 'Caption', NLSGetMessage( 51 )           /* 51: The printer has been created. */
+        CALL NLSSetText 'PB_NEXT', 'Caption', NLSGetMessage( 53 )           /* 53: Create another */
     END
-    CALL VRSet 'PB_CANCEL', 'Caption', 'Close'
+    CALL NLSSetText 'PB_CANCEL', 'Caption', NLSGetMessage( 55 )             /* 55: Close */
 
     CALL LINEOUT globals.!log1, ''
     CALL LINEOUT globals.!log1
@@ -159,7 +160,7 @@ CreateCupsPrinter: PROCEDURE EXPOSE globals.
         cups_cmd = cups_cmd '-L "'globals.!prt_loc'"'
     IF globals.!prt_dev <> '' THEN
         cups_cmd = cups_cmd '-v "'globals.!prt_port'" -m' globals.!prt_dev
-    ELSE IF globals.!mode == 2 THEN 
+    ELSE IF globals.!mode == 2 THEN
         cups_cmd = cups_cmd '-v "'globals.!prt_port'" -P "'globals.!prt_ppd'"'
     ELSE DO
         PARSE VAR globals.!prt_ppd (globals.!cupsdir)'\share\cups\model\' model
@@ -203,7 +204,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     port_name     = GetNextPortName('CUPS')
 
     /* Determine the printer driver source directories/files.  Yes, this is
-     * repeated from ImportPPD, but we have to do it again here because 
+     * repeated from ImportPPD, but we have to do it again here because
      * (a) we might not have gone through ImportPPD to get to this point, and
      * (b) even if we did, the repository information might have changed.
      */
@@ -216,11 +217,9 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
 
     IF driver_path == '' THEN DO
         /* TODO allow the user to browse for the driver on their system */
-        CALL VRMessage VRWindow(), 'The printer driver' prnt_drv 'could not  ',
-                                   'be located.  If you have the driver      ',
-                                   'files, please copy them to the directory ',
-                                   globals.!os2dir'\DLL\'prnt_drv' and then  ',
-                                   'try again.', 'Driver Not Found', 'E'
+        CALL VRMessage VRWindow(),,
+                       NLSGetMessage( 61, prnt_drv, globals.!os2dir'\DLL\'prnt_drv ),,    /* 61: The printer driver %1 could not be located.  If you have the driver files, please copy them to the directory %2 and then try again. */
+                       NLSGetMessage( 57 ), 'E'                                           /* 57: Driver Not Found */
         RETURN 1
     END
 
@@ -231,7 +230,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
         RETURN 1
 
     /* New logic to create the printer ourselves (instead of using RINSTPRN).
-     * There are two necessary steps: make sure the driver is installed, and 
+     * There are two necessary steps: make sure the driver is installed, and
      * then create the printer object (which causes the underlying device and
      * queue to be created automatically as well).
      */
@@ -239,7 +238,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     result = InstallPrintDriver( prnt_drv, driver_path, printer_model )
     CALL LINEOUT globals.!log1, 'InstallPrintDriver(' prnt_drv',' driver_path',' printer_model ') RC =' result
 
-    IF result == 0 THEN 
+    IF result == 0 THEN
         result = CreatePrinterObject( prnt_drv, printer_model,,
                                       port_name, queue_name, printer_title )
     CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv',' printer_model,
@@ -249,11 +248,9 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     IF result <> 0 THEN
         CALL DeletePort port_name
     ELSE IF port_ok == 1 THEN DO
-        CALL VRMessage VRWindow(),
-                       'The installed version of CUPS.PDR appears to be out of ',
-                       'date.  As a result, the desktop printer will not be ',
-                       'usable until the desktop is restarted.',,
-                       'Port Driver Problem', 'W'
+        CALL VRMessage VRWindow(),,
+                       NLSGetMessage( 62 ),,        /* 62: The installed version of CUPS.PDR appears to be out of date.  As a result, the desktop printer will not be usable until the desktop is restarted. */
+                       NLSGetMessage( 58 ), 'W'     /* 58: Port Driver Problem */ 
     END
 
 RETURN result
@@ -280,7 +277,10 @@ CreatePrinter: PROCEDURE EXPOSE globals.
             ok = ImportPPD( globals.!os2driver, globals.!prt_ppd )
             IF ok <> 0 THEN DO
                 CALL LINEOUT globals.!log1, 'PPD import failed:' ok
-                RETURN 1                /** RC=1  PPD import failed **/
+                CALL VRMessage VRWindow(), NLSGetMessage( 69 ),,        /* 69: The printer parameters could not ... PPD file. */
+                               NLSGetMessage( 70 ), 'W'                 /* 70: Error importing PPD file */
+                CALL PromptForPMName
+                /* RETURN 1                RC=1  PPD import failed **/
             END
         END
         ELSE IF PrinterExistsInDRV( globals.!os2driver, globals.!prt_nick ) == 0 THEN DO
@@ -293,7 +293,9 @@ CreatePrinter: PROCEDURE EXPOSE globals.
                 ok = ImportPPD(globals.!os2driver, cups_ppd )
                 IF ok <> 0 THEN DO
                     CALL LINEOUT globals.!log1, 'PPD import failed:' ok
-                    RETURN 1                /** RC=1  PPD import failed **/
+                    CALL VRMessage VRWindow(), NLSGetMessage( 69 ),  NLSGetMessage( 70 ), 'W'
+                    CALL PromptForPMName
+                    /* RETURN 1                RC=1  PPD import failed **/
                 END
             END
         END
@@ -307,7 +309,7 @@ RETURN 0
 
 /*:VRX         DDCB_PROTOCOL_Change
 */
-DDCB_PROTOCOL_Change: PROCEDURE
+DDCB_PROTOCOL_Change: PROCEDURE EXPOSE globals.
 
     idx = VRGet('DDCB_PROTOCOL', 'Selected')
     which = VRMethod('DDCB_PROTOCOL', 'GetItemData', idx )
@@ -316,40 +318,47 @@ DDCB_PROTOCOL_Change: PROCEDURE
             show_queue = 1
             show_user  = 1
             show_pass  = 1
-            CALL VRSet 'DT_SERVER',  'Caption', 'Printer or server address:'
-            CALL VRSet 'DT_QUEUE',   'Caption', 'Printer queue name:'
-            CALL VRSet 'DT_USERID',  'Caption', 'User ID:'
+            server_caption = 82          /* 82: Printer or server address: */
+            queue_caption  = 84          /* 84: Printer queue name: */
+            userid_caption = 86          /* 86: User ID: */
         END
         WHEN which == 2 THEN DO     /* SOCKET */
             show_queue = 0
             show_user  = 0
             show_pass  = 0
-            CALL VRSet 'DT_SERVER',  'Caption', 'Printer or server address:'
+            server_caption = 82          /* 82: Printer or server address: */
+            queue_caption  = 84          /* 84: Printer queue name: */
+            userid_caption = 86          /* 86: User ID: */
         END
         WHEN which == 3 THEN DO     /* LPD */
             show_queue = 1
             show_user  = 1
             show_pass  = 0
-            CALL VRSet 'DT_SERVER',  'Caption', 'Printer or server address:'
-            CALL VRSet 'DT_QUEUE',   'Caption', 'Printer queue name:'
-            CALL VRSet 'DT_USERID',  'Caption', 'User ID (if required):'
+            server_caption = 82          /* 82: Printer or server address: */
+            queue_caption  = 84          /* 84: Printer queue name: */
+            userid_caption = 87          /* 87: User ID (if required): */
         END
         WHEN which == 4 THEN DO     /* SMB */
             show_queue = 1
             show_user  = 1
             show_pass  = 1
-            CALL VRSet 'DT_SERVER',  'Caption', 'Print server name:'
-            CALL VRSet 'DT_QUEUE',  'Caption', 'Shared printer name:'
-            CALL VRSet 'DT_USERID', 'Caption', 'User ID:'
+            server_caption = 83          /* 83: Print server name: */
+            queue_caption  = 85          /* 85: Shared printer name: */
+            userid_caption = 86          /* 86: User ID: */
         END
         OTHERWISE DO                /* CUPS */
             show_queue = 1
             show_user  = 0
             show_pass  = 0
-            CALL VRSet 'DT_SERVER',  'Caption', 'CUPS server name:'
-            CALL VRSet 'DT_QUEUE',  'Caption',  'CUPS printer name:'
+            server_caption = 88          /* 88: CUPS server name: */
+            queue_caption  = 89          /* 89: CUPS printer name: */
+            userid_caption = 86          /* 86: User ID: */
         END
     END
+
+    r = NLSSetText('DT_SERVER', 'Caption', server_caption )
+    r = NLSSetText('DT_QUEUE',  'Caption', queue_caption )
+    r = NLSSetText('DT_USERID', 'Caption', userid_caption )
 
     CALL VRSet 'DT_QUEUE',    'Visible', show_queue
     CALL VRSet 'EF_QUEUE',    'Visible', show_queue
@@ -394,7 +403,7 @@ return 0
 */
 GetCupsPorts: PROCEDURE EXPOSE globals.
 
-    CALL VRSet 'DT_INFO', 'Caption', 'Looking for connected printers.  Please wait...'
+    CALL NLSSetText 'DT_INFO', 'Caption', 30        /* 30: Looking for connected printers.  Please wait... */
 
     lpinfo_cmd = globals.!cupsdir'\sbin\lpinfo.exe -v |rxqueue'
     snmp_cmd   = globals.!cupsdir'\lib\cups\backend\snmp.exe |rxqueue'
@@ -404,8 +413,8 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
     listqueue = RXQUEUE('CREATE')
     defqueue  = RXQUEUE('SET', listqueue )
 
-    /* Use the SNMP backend to find network printers.  We do this in addition 
-     * to lpinfo because SNMP may provide the actual printer name.  We'll 
+    /* Use the SNMP backend to find network printers.  We do this in addition
+     * to lpinfo because SNMP may provide the actual printer name.  We'll
      * merge this with the output of lpinfo in the next step.
      */
     ADDRESS CMD '@' snmp_cmd listqueue
@@ -431,16 +440,16 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
             ELSE _protocol = TRANSLATE( _protocol )
             i = i + 1
             IF _queue <> '' THEN _queue = '(queue '_queue')'
-            IF SYMBOL('netnames._name') == 'VAR' THEN 
-                devices.i = 'Detected network printer ('_protocol') "'netnames._name'" at' _host _queue
+            IF SYMBOL('netnames._name') == 'VAR' THEN
+                devices.i = NLSGetMessage( 32, _protocol, netnames._name, _host _queue )    /* 32: Detected network printer (%1) "%2" at %3 */
             ELSE
-                devices.i = 'Detected network printer ('_protocol') at' _host _queue
+                devices.i = NLSGetMessage( 33, _protocol, _host _queue )                    /* 33: Detected network printer (%1) at %2 */
         END
         ELSE IF _type <> 'direct' THEN ITERATE
         ELSE DO
             IF _name == 'hp' THEN ITERATE
             i = i + 1
-            devices.i = 'Local printer:' _name
+            devices.i = NLSGetMessage( 35, _name )                                          /* 35: Local printer: %1 */
         END
         ports.i = _name
     END
@@ -452,11 +461,11 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
 
     CALL VRSet    'LB_SELECT', 'Painting', 0
     CALL VRMethod 'LB_SELECT', 'AddStringList', 'devices.',, 'ports.'
-    CALL VRMethod 'LB_SELECT', 'AddString', 'Network printer (manual configuration)',, ''
+    CALL VRMethod 'LB_SELECT', 'AddString', NLSGetMessage( 34 ),, ''                        /* 34: Network printer (manual configuration) */
     CALL VRSet    'LB_SELECT', 'Selected', 1
     CALL VRSet    'LB_SELECT', 'Painting', 1
 
-    CALL VRSet 'DT_INFO', 'Caption', 'Select the connection for this printer.'
+    CALL VRSet 'DT_INFO', 'Caption', NLSGetMessage( 31 )                                    /* 31: Select the connection for this printer. */
 
 RETURN
 
@@ -464,7 +473,7 @@ RETURN
 */
 GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
 
-    CALL VRSet 'DT_INFO', 'Caption', 'Getting list of supported printers.  Please wait...'
+    CALL NLSSetText 'DT_INFO', 'Caption', 20                /* 20: Getting list of supported printers.  Please wait... */
 
     lpinfo_cmd = globals.!cupsdir'\sbin\lpinfo.exe --exclude-schemes drv -m 2>&1 |rxqueue'
 
@@ -518,7 +527,6 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
  *                                            - if defined this is usually the non-"simplified" driver
  *    manufacturers.i.!printers.j.!remark2    any distinguishing remarks for the alternate driver
  */
-
     manufacturers.0 = WORDS( makers )
     DO i = 1 TO manufacturers.0
         manufacturers.i.!name = WORD( makers, i )
@@ -583,17 +591,17 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
     /* Add one more category for special items ...
      */
     count = manufacturers.0 + 1
-    manufacturers.count.!name = '-- Custom --'
+    manufacturers.count.!name = NLSGetMessage( 22 )                     /* 22: -- Custom -- */
     manufacturers.count.!printers.0 = 1
-    manufacturers.count.!printers.1.!model   = '-- Other printer (requires PPD) --'
+    manufacturers.count.!printers.1.!model   = NLSGetMessage( 23 )      /* 23: -- Other printer (requires PPD) -- */
     manufacturers.count.!printers.1.!driver  = ''
     manufacturers.count.!printers.1.!type    = ''
-    manufacturers.count.!printers.1.!remark  = '-- Other printer (requires PPD) --'
+    manufacturers.count.!printers.1.!remark  = manufacturers.count.!printers.1.!model
     manufacturers.count.!printers.1.!driver2 = ''
     manufacturers.count.!printers.1.!remark2 = ''
     manufacturers.0 = count
 
-    CALL VRSet 'DT_INFO', 'Caption', 'Select the printer manufacturer and model from the list below.'
+    CALL NLSSetText 'DT_INFO', 'Caption', 21                            /* 21: Select the printer manufacturer and model from the list below. */
 
 RETURN
 
@@ -652,19 +660,16 @@ ImportPPD: PROCEDURE EXPOSE globals.
          * to tell us where, because they're going to have to specify the
          * directory later on if they install the driver from PM.
          */
-        pbtn.1 = 'OK'
-        pbtn.2 = 'Cancel'
+        pbtn.1 = NLSGetMessage( 2 )                     /* 2: OK */
+        pbtn.2 = NLSGetMessage( 3 )                     /* 3: Cancel */
         pbtn.0 = 2
-        ptext = 'The install files for the' driver 'driver could not be '  ||,
-                'located.  These files will be recreated from the driver ' ||,
-                'files which are already installed on your system.'        ||,
-                '0d0a0d0a'x || 'Please enter the directory where the '     ||,
-                'install files will be placed.'
+        ptext = NLSGetMessage( 63, driver ) ||,         /* 63: The install files for the %1 driver could not be located.  These files will be recreated from the driver files which are already installed on your system. */
+                '0d0a0d0a'x || NLSGetMessage( 64 )      /* 64: Please enter the directory where the install files will be placed. */
+
         PARSE VALUE VRGetIni('PM_INSTALL', driver'_DIR', 'USER') WITH drvr_dir '00'x .
         IF drvr_dir == '' THEN
             PARSE VALUE VRGetIni('InstPDR', 'PATH_TO_'driver, 'USER') WITH drvr_dir '00'x .
-        ok = VRPrompt('WN_MAIN', ptext, 'drvr_dir',,
-                      'Enter Directory', 'pbtn.', 1, 2 )
+        ok = VRPrompt('WN_MAIN', ptext, 'drvr_dir', NLSGetMessage( 59 ), 'pbtn.', 1, 2 )        /* 59: Enter Directory */
         IF ok <> 1 THEN RETURN 9        /** RC=9  User cancelled **/
         drvr_dir = VRExpandFileName( drvr_dir )
         DO WHILE drvr_dir == ''
@@ -765,7 +770,7 @@ ImportPPD: PROCEDURE EXPOSE globals.
      * First, PPDENC converts the codepage if necessary, and copies the results
      * to our working directory.
      */
-    ADDRESS CMD '@'ppd_exe ppdfile ppd_use '2>&1 | RXQUEUE' nq
+    ADDRESS CMD '@'ppd_exe ppdfile ppd_use '2>NUL 1| RXQUEUE' nq
     DO QUEUED()
         PULL output
         CALL LINEOUT globals.!log2, output
@@ -781,7 +786,7 @@ ImportPPD: PROCEDURE EXPOSE globals.
     /* Preparation complete.  Now do the import.
      */
     count = 0
-    ADDRESS CMD '@'pin_exe 'ppd' ppddir drv_out '2>&1 | RXQUEUE' nq
+    ADDRESS CMD '@'pin_exe 'ppd' ppddir drv_out '2>NUL 1| RXQUEUE' nq
     DO QUEUED()
         PARSE PULL output
         CALL LINEOUT globals.!log2, output
@@ -897,26 +902,24 @@ RETURN 0
 Init:
     SIGNAL ON NOVALUE NAME __NoValue
 
+    /* Hide the VX-REXX console window
+     */
+    CALL VRSet 'Console', 'WindowListTitle', ''
+
     CALL RxFuncAdd 'SysLoadFuncs', 'REXXUTIL', 'SysLoadFuncs'
     CALL SysLoadFuncs
 
     CALL LoadSettings
+    CALL SetLanguage
 
     IF InitArgs.0 > 0 THEN globals.!cupsdir = InitArgs.1
 
     IF \VRIsDir( globals.!cupsdir ) THEN DO
         IF TRANSLATE( globals.!cupsdir ) <> '/R' THEN
-            CALL VRMessage VRWindow(),,
-                           'CUPS could not be located.  If you wish to use ' ||,
-                           'a local installation of CUPS, please specify '   ||,
-                           'the path where CUPS is installed on the command '||,
-                           'line to this program (e.g "CUPSWIZ F:\CUPS").'   ||,
-                           '0d0a0d0a'x ||,
-                           'Only remote CUPS queues will be available for '  ||,
-                           'printers created in this session.  (To skip '    ||,
-                           'this message in the future, start this program ' ||,
-                           'with the /R parameter.)',,
-                           'CUPS Path Not Found or Not Valid', 'E'
+            CALL VRMessage VRWindow(), 
+                           NLSGetMessage( 65, 'CUPSWIZ F:\CUPS') ||,    /* 65: CUPS could not be located ... on the command line to this program (e.g "%1"). */
+                           '0d0a0d0a'x || NLSGetMessage( 66 ),,         /* 66: Only remote CUPS queues ... start this program with the /R parameter.) */
+                           NLSGetMessage( 28 ), 'E'                     /* 28: CUPS Path Not Found or Not Valid */
         globals.!cupsdir = ''
     END
 
@@ -931,6 +934,7 @@ Init:
     call VRMethod window, "Activate"
     drop window
 
+    manufacturers.0 = 0
     CALL SetPage1
 
 RETURN
@@ -1022,7 +1026,7 @@ LB_SELECT_Click: PROCEDURE EXPOSE globals. manufacturers.
                 remark = manufacturers.man.!printers.which.!remark
                 IF driver == '' THEN
                     type = ''
-                ELSE IF remark == '' THEN 
+                ELSE IF remark == '' THEN
                     type = ' ('driver')'
                 ELSE
                     type = ' ('driver' - 'remark')'
@@ -1078,6 +1082,10 @@ LoadSettings: PROCEDURE EXPOSE globals.
     globals.!prdrv      = STREAM( globals.!os2dir'\install\prdrv.lst',  'C', 'QUERY EXISTS')
     globals.!prdesc     = STREAM( globals.!os2dir'\install\prdesc.lst', 'C', 'QUERY EXISTS')
 
+    /* Set the language file name.
+     */
+    globals.!nlsfile = 'cupswz'
+
 RETURN 0
 
 /*:VRX         LoopbackName
@@ -1108,7 +1116,7 @@ RETURN lo_name
 
 /*:VRX         PB_ABOUT_Click
 */
-PB_ABOUT_Click: 
+PB_ABOUT_Click:
     CALL SW_ABOUT_Close
 RETURN
 
@@ -1213,7 +1221,8 @@ PB_NETOK_Click: PROCEDURE EXPOSE globals. port
     END
 
     IF invalid == 1 THEN DO
-        CALL VRMessage VRWindow(), 'Missing required value(s).', 'Missing Value(s)', 'E'
+        CALL VRMessage VRWindow(), NLSGetMessage( 74 ),,        /* 74: Missing required value(s). */
+                                   NLSGetMessage( 75 ), 'E'     /* 75: Missing Value(s) */
         RETURN
     END
 
@@ -1238,14 +1247,14 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
             which = VRMethod('LB_SELECT', 'GetItemData', selected )
             IF which == '' THEN DO
                 globals.!mode = 2   /* Mode 2: user-selected PPD file */
-                ppd = VRFileDialog( VRWindow(), 'Select PPD', 'O', '*.ppd')
+                ppd = VRFileDialog( VRWindow(), NLSGetMessage( 24 ), 'O', '*.ppd')      /* 24: Select PPD */
                 IF ppd == '' THEN RETURN
                 globals.!prt_ppd  = ppd
                 globals.!prt_dev  = ''
                 globals.!prt_nick = GetNameFromPPD( ppd )
                 IF globals.!prt_nick == '' THEN DO
-                    CALL VRMessage VRWindow(), 'Could not read printer name '||,
-                                               'from' ppd'.', 'Invalid PPD', 'E'
+                    CALL VRMessage VRWindow(), NLSGetMessage( 76, ppd ),,       /* 76: Could not read printer name from %1. */
+                                               NLSGetMessage( 77 ), 'E'         /* 77: Invalid PPD */
                     RETURN
                 END
             END
@@ -1317,10 +1326,10 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
                 ( globals.!prt_info == '') THEN
             DO
                 IF ( globals.!remotecups <> '') THEN
-                    _errmsg = 'You must enter a description.'
+                    _errmsg = NLSGetMessage( 42 )                               /* 42: You must enter a description. */
                 ELSE
-                    _errmsg = 'You must enter a name, a location, and a description.'
-                CALL VRMessage VRWindow(), _errmsg, 'Missing Value(s)', 'E'
+                    _errmsg = NLSGetMessage( 43 )                               /* 43: You must enter a name, a location, and a description. */
+                CALL VRMessage VRWindow(), _errmsg, NLSGetMessage( 75 ), 'E'    /* 75: Missing Value(s) */
                 RETURN
             END
             IF ( globals.!remotecups == '' &,
@@ -1328,9 +1337,8 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
                       'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz') == 0 ) |,
                 ( VERIFY( globals.!prt_name, '/# ' || '09'x, 'MATCH') <> 0 )) THEN
             DO
-                CALL VRMessage VRWindow(),  'The printer name must start '     ||,
-                               'with a letter, and may not include "/", "#", ' ||,
-                               'space, or tab characters.', 'Invalid Name', 'E'
+                CALL VRMessage VRWindow(), NLSGetMessage( 44 ),,                /* 44: The printer name must start with ... or tab characters. */
+                                           NLSGetMessage( 45 ), 'E'             /* 45: Invalid Name */
                 RETURN
             END
 
@@ -1347,7 +1355,7 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
         END
 
         WHEN globals.!page == 4 THEN DO
-            CALL VRSet 'PB_NEXT',     'Caption', 'Next >'
+            CALL NLSSetText 'PB_NEXT', 'Caption', 5                 /* 5: Next > */
             CALL VRSet 'EF_NAME',     'Value', ''
             CALL VRSet 'EF_LOCATION', 'Value', ''
             CALL VRSet 'EF_DESC',     'Value', ''
@@ -1374,12 +1382,8 @@ PromptForPMName: PROCEDURE EXPOSE globals. models. best
         /* No similar models were found in the list of supported printers.
          * Just use the generic PS driver.
          */
-        CALL VRMessage VRWindow(),,
-                       'The printer "'globals.!prt_nick'" does not appear to' ,
-                       'be supported by the' globals.!os2driver 'driver, and' ,
-                       'no similar models were found.  The generic PostScript',
-                       'driver will be used for application support.',,
-                       'Printer Name Not Found', 'W'
+        CALL VRMessage VRWindow(), NLSGetMessage( 67, globals.!prt_nick, globals.!os2driver ),,     /* 67: The printer "%1" does not ... application support. */
+                                   NLSGetMessage( 68 ), 'W'                                         /* 68: Printer Name Not Found */
         globals.!prt_nick = 'Generic PostScript Printer'
         RETURN
     END
@@ -1396,10 +1400,68 @@ Quit:
     drop window
 return
 
+/*:VRX         SetLanguage
+*/
+SetLanguage: PROCEDURE EXPOSE globals.
+    PARSE ARG locale
+
+    /*
+     * This function locates the proper language files, and uses the message
+     * file to sets all UI text.  If the language could not be determined, we
+     * default to English.
+     */
+    execPath = VRGet('Application', 'Program')
+    execDir  = VRParseFileName( execPath, 'DP')
+
+    /*
+     * First, figure out what language/message file to use.
+     */
+    IF locale <> '' THEN
+        syslanguage = locale
+    ELSE
+        syslanguage = VALUE('LANG',,'OS2ENVIRONMENT')
+
+    SELECT
+        WHEN TRANSLATE( syslanguage ) == 'ZH_TW' THEN nlv = 'tw'
+        WHEN TRANSLATE( syslanguage ) == 'ZH_CN' THEN nlv = 'cx'
+        OTHERWISE                                PARSE VAR syslanguage nlv '_' .
+    END
+    nlvfile = globals.!nlsfile || nlv
+    IF ( STREAM( execDir'\'nlvfile'.msg', 'C', 'QUERY EXISTS') \= '') | ( SysSearchPath('DPATH', nlvfile'.msg') \= '') THEN DO
+        globals.!messages = nlvfile'.msg'
+        helpfile          = nlvfile'.hlp'
+        CALL VRSet 'WN_MAIN', 'HelpFile', helpfile
+    END
+    ELSE DO
+        globals.!messages = globals.!nlsfile || 'en.msg'
+        helpfile          = globals.!nlsfile || 'en.hlp'
+        CALL VRSet 'WN_MAIN', 'HelpFile', helpfile
+    END
+
+    /*
+     * If the message file is missing or unreadable, display an error and then exit.
+     */
+    IF NLSGetMessage( 1 ) == '' THEN DO
+        CALL VRMessage VRWindow(), 'Language file' TRANSLATE( globals.!messages ) 'could not be loaded.', 'Cannot Continue', 'E'
+        RETURN 0
+    END
+
+    /*
+     * Now set the captions for the UI controls on the main window, according
+     * to the specified language.
+     */
+    CALL NLSSetText 'WN_MAIN',    'Caption', 1         /* 1: Create CUPS Printer */
+    CALL NLSSetText 'PB_NEXT',    'Caption', 5         /* 5: Next > */
+    CALL NLSSetText 'PB_CANCEL',  'Caption', 3         /* 3: Cancel */
+    CALL NLSSetText 'PB_REFRESH', 'Caption', 6         /* 6: Refresh */
+
+RETURN 1
+
 /*:VRX         SetPage1
 */
 SetPage1: PROCEDURE EXPOSE globals. manufacturers.
 
+    CALL VRMethod 'LB_BRAND', 'Clear'
     CALL VRSet 'PB_NEXT',  'Enabled', 0
     CALL VRSet 'LB_BRAND', 'Visible', 1
 
@@ -1425,20 +1487,24 @@ SetPage1: PROCEDURE EXPOSE globals. manufacturers.
 
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
 
-    /* Populate the manufacturer list */
-    IF globals.!cupsdir == '' THEN DO
-        manufacturers.1.!name = '-- Custom --'
-        manufacturers.1.!printers.0 = 1
-        manufacturers.1.!printers.1.!model   = '-- Other printer (requires PPD) --'
-        manufacturers.1.!printers.1.!driver  = ''
-        manufacturers.1.!printers.1.!type    = ''
-        manufacturers.1.!printers.1.!remark  = '-- Other printer (requires PPD) --'
-        manufacturers.1.!printers.1.!driver2 = ''
-        manufacturers.1.!printers.1.!remark2 = ''
-        manufacturers.0 = 1
+    IF manufacturers.0 == 0 THEN DO
+
+        /* Populate the manufacturer list */
+        IF globals.!cupsdir == '' THEN DO
+            manufacturers.1.!name = NLSGetMessage( 22 )                     /* 22: -- Custom -- */
+            manufacturers.1.!printers.0 = 1
+            manufacturers.1.!printers.1.!model   = NLSGetMessage( 23 )      /* 23: -- Other printer (requires PPD) -- */
+            manufacturers.1.!printers.1.!driver  = ''
+            manufacturers.1.!printers.1.!type    = ''
+            manufacturers.1.!printers.1.!remark  = NLSGetMessage( 23 )      /* 23: -- Other printer (requires PPD) -- */
+            manufacturers.1.!printers.1.!driver2 = ''
+            manufacturers.1.!printers.1.!remark2 = ''
+            manufacturers.0 = 1
+        END
+        ELSE
+            CALL GetCupsPrinters
+
     END
-    ELSE 
-        CALL GetCupsPrinters
 
     CALL VRSet 'LB_BRAND',  'Painting', 0
     DO i = 1 TO manufacturers.0
@@ -1463,7 +1529,7 @@ SetPage2: PROCEDURE EXPOSE globals.
     globals.!page = 2
     CALL VRSet 'LB_BRAND', 'Visible', 0
     CALL VRSet 'PB_NEXT',  'Enabled', 0
-    CALL VRSet 'WN_MAIN', 'StatusText', 'Selected printer: ' globals.!prt_nick 
+    CALL NLSSetText 'WN_MAIN', 'StatusText', 29, globals.!prt_nick          /* 29: Selected printer:  %1 */
 
     /* Resize LB_SELECT to the full width of GB_INFO */
     lb_x = VRGet('GB_INFO', 'Left')
@@ -1475,7 +1541,7 @@ SetPage2: PROCEDURE EXPOSE globals.
 
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
     IF globals.!cupsdir == '' THEN DO
-        CALL VRMethod 'LB_SELECT', 'AddString', 'Network printer (manual configuration)',, ''
+        CALL VRMethod 'LB_SELECT', 'AddString', NLSGetMessage( 34 ),, ''    /* 34: Network printer (manual configuration) */
         CALL VRSet    'LB_SELECT', 'Selected', 1
     END
     ELSE
@@ -1491,21 +1557,23 @@ SetPage3: PROCEDURE EXPOSE globals.
 
     globals.!page = 3
     CALL VRSet 'EF_DESC', 'Value', globals.!prt_nick
+    CALL NLSSetText DT_NAME,     'Caption', 103             /* 103: Name: */
+    CALL NLSSetText DT_LOCATION, 'Caption', 105             /* 105: Location: */
+    CALL NLSSetText DT_DESC,     'Caption', 106             /* 106: Description: */
 
     CALL VRMethod 'LB_SELECT', 'Clear'
 
     CALL VRSet 'LB_SELECT',   'Visible', 0
     CALL VRSet 'GB_INFO',     'Visible', 1
     IF globals.!remotecups == '' THEN DO
-        CALL VRSet 'DT_INFO', 'Caption', 'Choose the printer name, and enter its location and a short description.'
+        CALL NLSSetText 'DT_INFO', 'Caption', 40        /* 40: Choose the printer name, and enter its location and a short description. */
         CALL VRSet 'DT_NAME',     'Visible', 1
         CALL VRSet 'EF_NAME',     'Visible', 1
         CALL VRSet 'DT_LOCATION', 'Visible', 1
         CALL VRSet 'EF_LOCATION', 'Visible', 1
     END
     ELSE
-        CALL VRSet 'DT_INFO', 'Caption', 'Enter a short description of this printer. ',
-                                         'This will be used for the printer object that appears on your desktop.'
+        CALL NLSSetText 'DT_INFO', 'Caption', 41        /* 41: Enter a short description of this printer.  This will be used for the printer object that appears on your desktop. */
     CALL VRSet 'DT_DESC',     'Visible', 1
     CALL VRSet 'EF_DESC',     'Visible', 1
 
@@ -1526,30 +1594,36 @@ RETURN
 
 /*:VRX         SW_ABOUT_Close
 */
-SW_ABOUT_Close: 
+SW_ABOUT_Close:
     call SW_ABOUT_Fini
 return
 
 /*:VRX         SW_ABOUT_Create
 */
-SW_ABOUT_Create: 
+SW_ABOUT_Create:
     call SW_ABOUT_Init
 return
 
 /*:VRX         SW_ABOUT_Fini
 */
-SW_ABOUT_Fini: 
+SW_ABOUT_Fini:
     window = VRInfo( "Window" )
     call VRDestroy window
     drop window
 return
 /*:VRX         SW_ABOUT_Init
 */
-SW_ABOUT_Init: 
+SW_ABOUT_Init:
 
-    CALL VRSet 'DT_BOOTDRIVE',  'Caption', 'System boot volume:' TRANSLATE( globals.!bootdrv )
-    CALL VRSet 'DT_CUPSPATH',   'Caption', 'Local CUPS directory:' TRANSLATE( globals.!cupsdir )
-    CALL VRSet 'DT_REPOSITORY', 'Caption', 'Local driver repository:' TRANSLATE( globals.!repository )
+    CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
+    CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.98'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010,2012'                             /* 13: (C) %1 Alex Taylor */
+    CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
+
+    CALL NLSSetText 'DT_BOOTDRIVE',  'Caption', 14, TRANSLATE( globals.!bootdrv )       /* 14: System boot volume: %1 */ 
+    CALL NLSSetText 'DT_CUPSPATH',   'Caption', 15, TRANSLATE( globals.!cupsdir )       /* 15: Local CUPS directory: %1 */ 
+    CALL NLSSetText 'DT_REPOSITORY', 'Caption', 16, TRANSLATE( globals.!repository )    /* 16: Local driver repository: %1 */
 
     window = VRInfo( "Object" )
     if( \VRIsChildOf( window, "Notebook" ) ) then do
@@ -1583,6 +1657,17 @@ return
 */
 SW_CREATE_Init:
 
+    CALL NLSSetText 'SW_CREATE',  'Caption', 115                 /* 115: Confirm Create Printer */
+    CALL NLSSetText 'DT_CRMODEL', 'Caption', 102                 /* 102: Model: */
+    CALL NLSSetText 'DT_CRLOC',   'Caption', 105                 /* 105: Location: */
+    CALL NLSSetText 'DT_CRDESC',  'Caption', 106                 /* 106: Description: */
+
+    CALL NLSSetText 'CHK_CREATEPM', 'Caption',  109              /* 109: Create printer object */
+    CALL NLSSetText 'DT_PRESDRV',   'Caption',  110              /* 110: Presentation driver: */
+    CALL NLSSetText 'PB_CREATEOK',  'Caption',  111              /* 111: Create */
+    CALL NLSSetText 'PB_CREATECANCEL', 'Caption',  3             /* 3: Cancel */
+    CALL NLSSetText 'PB_CREATEHELP',   'Caption',  4             /* 4: ~Help */
+
     CALL VRSet 'EF_CRMODEL', 'Value', globals.!prt_nick
 
     IF globals.!remotecups <> '' THEN DO
@@ -1590,18 +1675,21 @@ SW_CREATE_Init:
          * creating a CUPS printer, but only a PM printer object (and port)
          * that points to it.
          */
-        CALL VRSet 'DT_CREATE', 'Caption', 'Ready to create printer object with the following parameters.'
+        CALL NLSSetText 'DT_CREATE', 'Caption', 101             /* 101: Ready to create printer object with the following parameters. */
 
         PARSE VAR globals.!remotecups cups_host cups_printer .
-        CALL VRSet 'DT_CRNAME',    'Caption', 'CUPS server:'
-        CALL VRSet 'EF_CRNAME',    'Value',   cups_host
-        CALL VRSet 'DT_CRURI',     'Caption', 'CUPS queue:'
-        CALL VRSet 'EF_CRURI',     'Value',   cups_printer
+        CALL NLSSetText 'DT_CRNAME', 'Caption', 107             /* 107: CUPS server: */
+        CALL NLSSetText 'DT_CRURI',  'Caption', 108             /* 108: CUPS queue:  */
         CALL VRSet 'DT_CRLOC',     'Visible', 0
+        CALL VRSet 'EF_CRNAME',    'Value',   cups_host
+        CALL VRSet 'EF_CRURI',     'Value',   cups_printer
         CALL VRSet 'EF_CRLOC',     'Visible', 0
         CALL VRSet 'CHK_CREATEPM', 'Visible', 0
     END
     ELSE DO
+        CALL NLSSetText 'DT_CREATE', 'Caption', 100             /* 100: Ready to create CUPS printer with the following parameters. */
+        CALL NLSSetText 'DT_CRNAME', 'Caption', 103             /* 103: Name: */
+        CALL NLSSetText 'DT_CRURI',  'Caption', 104             /* 104: URI: */
         CALL VRSet 'EF_CRNAME', 'Value', globals.!prt_name
         CALL VRSet 'EF_CRURI',  'Value', globals.!prt_port
         CALL VRSet 'EF_CRLOC',  'Value', globals.!prt_loc
@@ -1619,10 +1707,11 @@ SW_CREATE_Init:
         END
         CALL VRSet 'DDCB_PRESDRV', 'Selected', def_idx
     END
-    ELSE DO
-        CALL VRMessage VRWindow(), 'No eCups-compatible OS/2 presentation drivers are installed.',
-                       '0d0a0d0a'x || 'Please install the ECUPS or ECUPS-HP printer driver before continuing.',,
-                       'Missing PM Driver', 'E'
+    ELSE DO                                             /* 112: No eCups-compatible OS/2 presentation drivers are installed. */
+                                                        /* 113: Please install the ECUPS or ECUPS-HP printer driver before continuing. */
+        CALL VRMessage VRWindow(), 
+                       NLSGetMessage( 112 ) || '0d0a0d0a'x || NLSGetMessage( 113 ),,  
+                       NLSGetMessage( 114 ), 'E'                                        /* 114: Missing PM Driver */
         CALL VRSet 'PB_CREATEOK', 'Enabled', 0
     /* TODO give an error if no drivers were found */
     END
@@ -1663,6 +1752,8 @@ return
 */
 SW_MODEL_Init:
 
+    CALL NLSSetText 'SW_MODEL', 'Caption', 120                      /* 120: Select Printer Model */
+
     /* We should have a list of suggested printer models whose names at least
      * partially match the requested model, sorted in order with the closest
      * match at the top.
@@ -1671,10 +1762,12 @@ SW_MODEL_Init:
     IF best > 0 THEN
         CALL VRSet 'LB_OS2MODELS', 'Selected', best
 
-    CALL VRSet 'DT_MODEL1', 'Caption',,
-               'The printer "'globals.!prt_nick'" could not be found in the'  ,
-               globals.!os2driver'.DRV driver under that name.  Please choose',
-               'the model of printer which will be reported to applications.'
+    CALL NLSSetText 'DT_MODEL1', 'Caption',, 
+                    121, globals.!prt_nick, globals.!os2driver      /* 121: The printer "%1" could not ... to applications. */
+    CALL NLSSetText 'DT_MODEL2', 'Caption', 122                     /* 122: You can select one of ... use a generic driver. */
+
+    CALL NLSSetText 'PB_MODELOK',     'Caption', 2                  /* 2: OK */
+    CALL NLSSetText 'PB_MODELCANCEL', 'Caption', 3                  /* 3: Cancel */
 
     CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
 
@@ -1711,19 +1804,26 @@ return
 */
 SW_NETWORK_Init:
 
+    CALL NLSSetText 'SW_NETWORK',   'Caption',  80    /* 80: Network Printer */
+    CALL NLSSetText 'DT_PROTOCOL',  'Caption',  81    /* 81: Network protocol: */
+    CALL NLSSetText 'DT_PASSWORD',  'Caption',  90    /* 90: Password: */
+    CALL NLSSetText 'PB_NETOK',     'Caption',  2     /* 2: OK */
+    CALL NLSSetText 'PB_NETCANCEL', 'Caption',  3     /* 3: Cancel */
+    CALL NLSSetText 'PB_NETHELP',   'Caption',  4     /* 4: ~Help */
+
     IF globals.!cupsdir == '' THEN DO
         protos.0 = 1
-        protos.1 = 'Existing CUPS printer (remote server)'
+        protos.1 = NLSGetMessage( 91 )              /* 91: Existing CUPS printer (remote server) */
         pnums.0 = 1
         pnums.1 = 5
     END
     ELSE DO
         protos.0 = 5
-        protos.1 = 'Internet Printing Protocol (IPP)'
-        protos.2 = 'AppSocket/JetDirect'
-        protos.3 = 'Line Printer Remote daemon (LPD)'
-        protos.4 = 'Windows/SMB network'
-        protos.5 = 'Existing CUPS printer'
+        protos.1 = NLSGetMessage( 92 )              /* 92: Internet Printing Protocol (IPP) */
+        protos.2 = NLSGetMessage( 93 )              /* 93: AppSocket/JetDirect */
+        protos.3 = NLSGetMessage( 94 )              /* 94: Line Printer Remote daemon (LPD) */
+        protos.4 = NLSGetMessage( 95 )              /* 95: Windows/SMB network */
+        protos.5 = NLSGetMessage( 96 )              /* 96: Existing CUPS printer */
         pnums.0 = 5
         pnums.1 = 1
         pnums.2 = 2

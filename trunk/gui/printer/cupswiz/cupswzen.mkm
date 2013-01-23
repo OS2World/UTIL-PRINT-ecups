@@ -1,0 +1,145 @@
+; Message file for CUPSWIZ
+; English version
+CWZ
+; Common strings
+CWZ0001I: Create CUPS Printer
+CWZ0002I: OK
+CWZ0003I: Cancel
+CWZ0004I: ~Help
+CWZ0005I: ~Next >
+CWZ0006I: ~Refresh
+CWZ0007?:
+CWZ0008?:
+CWZ0009?:
+;
+; Product information dialog
+CWZ0010I: Product Information
+CWZ0011I: eCups Printer Install Utility
+CWZ0012I: Version %1
+CWZ0013I: (C) %1 Alex Taylor
+CWZ0014I: System boot volume: %1
+CWZ0015I: Local CUPS directory: %1
+CWZ0016I: Local driver repository: %1
+CWZ0017?:
+CWZ0018?:
+CWZ0019?:
+;
+; Page 1 messages
+CWZ0020I: Getting list of supported printers.  Please wait...
+CWZ0021I: Select the printer manufacturer and model from the list below.
+CWZ0022I: -- Custom --
+CWZ0023I: -- Other printer (requires PPD) --
+CWZ0024I: Select PPD
+CWZ0025?:
+CWZ0026?:
+CWZ0027?:
+CWZ0028I: CUPS Path Not Found or Not Valid
+CWZ0029I: Selected printer:  %1
+;
+; Page 2 messages
+CWZ0030I: Looking for connected printers.  Please wait...
+CWZ0031I: Select the connection for this printer.
+CWZ0032I: Detected network printer (%1) "%2" at %3
+CWZ0033I: Detected network printer %1 at %2
+CWZ0034I: Network printer (manual configuration)
+CWZ0035I: Local printer: %1
+CWZ0036?:
+CWZ0037?:
+CWZ0038?:
+CWZ0039?:
+;
+; Page 3 messages
+CWZ0040I: Choose the printer name, and enter its location and a short description.
+CWZ0041I: Enter a short description of this printer.  This will be used for the printer object that appears on your desktop.
+CWZ0042I: You must enter a description.
+CWZ0043I: You must enter a name, a location, and a description.
+CWZ0044I: The printer name must start with a letter, and may not include "/", "#", space, or tab characters.
+CWZ0045I: Invalid Name
+CWZ0046?:
+CWZ0047?:
+CWZ0048?:
+CWZ0049?:
+;
+; Page 4
+CWZ0050I: Creating printer...
+CWZ0051I: The printer has been created.
+CWZ0052I: The printer could not be created.
+CWZ0053I: Create another
+CWZ0054I: Return
+CWZ0055I: Close
+CWZ0056I: Error Creating Printer
+CWZ0057I: Driver Not Found
+CWZ0058I: Port Driver Problem
+CWZ0059I: Enter Directory
+;
+; Error & warning messages
+CWZ0060I: The following error occurred when trying to create the printer:
+CWZ0061I: The printer driver %1 could not be located.  If you have the driver files, please copy them to the directory %2 and then try again.
+CWZ0062I: The installed version of CUPS.PDR appears to be out of date.  As a result, the desktop printer will not be usable until the desktop is restarted.
+CWZ0063I: The install files for the %1 driver could not be located.  These files will be recreated from the driver files which are already installed on your system.
+CWZ0064I: Please enter the directory where the install files will be placed.
+CWZ0065I: CUPS could not be located.  If you wish to use a local installation of CUPS, please specify the path where CUPS is installed on the command line to this program (e.g "%1").
+CWZ0066I: Only remote CUPS queues will be available for printers created in this session.  (To skip this warning in the future, start this program with the /R parameter.)
+CWZ0067I: The printer "%1" does not appear to be supported by the %2 driver, and no similar models were found.  The generic PostScript driver will be used for application support.
+CWZ0068I: Printer Name Not Found
+CWZ0069I: The printer parameters could not be imported, possibly due to an incompatible PPD file.
+CWZ0070I: Error Importing PPD File
+CWZ0071I: Error creating CUPS printer.  See %1 for more information.
+CWZ0072I: Error creating printer object.  See %1 for more information.
+CWZ0073I: Unknown error.
+CWZ0074I: Missing required value(s)
+CWZ0075I: Missing Value(s)
+CWZ0076I: Could not read printer name from %1.
+CWZ0077I: Invalid PPD
+CWZ0078?:
+CWZ0079?:
+;
+; Network settings dialog
+CWZ0080I: Network Printer
+CWZ0081I: Network protocol:
+CWZ0082I: Printer or server address:
+CWZ0083I: Print server name:
+CWZ0084I: Printer queue name:
+CWZ0085I: Shared printer name:
+CWZ0086I: User ID:
+CWZ0087I: User ID (if required):
+CWZ0088I: CUPS server name:
+CWZ0089I: CUPS printer name:
+CWZ0090I: Password:
+CWZ0091I: Existing CUPS printer (remote server)
+CWZ0092I: Internet Printing Protocol (IPP)
+CWZ0093I: AppSocket/JetDirect
+CWZ0094I: Line Printer Remote daemon (LPD)
+CWZ0095I: Windows/SMB network
+CWZ0096I: Existing CUPS printer
+CWZ0097?:
+CWZ0098?:
+CWZ0099?:
+;
+; Confirmation dialog and Page 3 labels
+CWZ0100I: Ready to create CUPS printer with the following parameters.
+CWZ0101I: Ready to create printer object with the following parameters.
+CWZ0102I: Model:
+CWZ0103I: Name:
+CWZ0104I: URI:
+CWZ0105I: Location:
+CWZ0106I: Description:
+CWZ0107I: CUPS server:
+CWZ0108I: CUPS queue:
+CWZ0109I: Create printer object
+CWZ0110I: Presentation driver:
+CWZ0111I: Create
+CWZ0112I: No eCups-compatible OS/2 presentation drivers are installed.
+CWZ0113I: Please install the ECUPS or ECUPS-HP printer driver before continuing.
+CWZ0114I: Missing PM Driver
+CWZ0115I: Confirm Create Printer
+CWZ0116?:
+CWZ0117?:
+CWZ0118?:
+CWZ0119?:
+;
+; Model disambiguation dialog
+CWZ0120I: Select Printer Model
+CWZ0121I: The printer "%1" could not be found in the %2.DRV driver under that name.  Please choose the model of printer which will be reported to applications.
+CWZ0122I: You can select one of the following suggested drivers, or choose 'Cancel' to use a generic driver.
+
