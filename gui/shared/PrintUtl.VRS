@@ -327,15 +327,16 @@ RETURN queuename
 InstallPrintDriver: PROCEDURE EXPOSE globals.
     PARSE ARG driver, driverfull, model
 
+    ok = 0
     targetdir = globals.!os2dir'\DLL\'driver
     IF ( VRFileExists( targetdir'\'driver'.DRV') == 0 ) THEN DO
         CALL VRMkDir targetdir
-        rc = CopyDriverToSource( driverfull, targetdir )
+        ok = CopyDriverToSource( driverfull, targetdir )
     END
     IF VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER', 'NoClose') <> driverfull THEN
         CALL VRSetIni 'PM_DEVICE_DRIVERS', driver, driverfull||'00'x, 'USER'
     CALL VRSetIni 'PM_SPOOLER_DD', driver'.'model, driver'.DRV;;;'||'00'x, 'SYSTEM'
-RETURN rc
+RETURN ok
 
 
 /*:VRX         CreatePrinterObject
@@ -349,13 +350,13 @@ CreatePrinterObject: PROCEDURE
     oid = '<WPPO_'queuename'>'
     setup = 'PORTNAME='portname';PRINTDRIVER='driver'.'model';QUEUENAME='queuename';TAKEDEFAULTS=YES'
 
-    rc = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';OBJECTID='oid';', 'F')
-    IF rc == 1 THEN
+    ok = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';OBJECTID='oid';', 'F')
+    IF ok == 1 THEN
         CALL SysMoveObject oid, '<WP_PRINTERSFOLDER>'
     ELSE
-        rc = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';', 'F')
+        ok = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';', 'F')
 
-RETURN rc
+RETURN ok
 
 
 /*:VRX         RSPCreatePort
