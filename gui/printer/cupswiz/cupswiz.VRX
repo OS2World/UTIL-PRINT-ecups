@@ -235,17 +235,17 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
      * queue to be created automatically as well).
      */
 
-    result = InstallPrintDriver( prnt_drv, driver_path, printer_model )
-    CALL LINEOUT globals.!log1, 'InstallPrintDriver(' prnt_drv',' driver_path',' printer_model ') RC =' result
+    ok = InstallPrintDriver( prnt_drv, driver_path, printer_model )
+    CALL LINEOUT globals.!log1, 'InstallPrintDriver(' prnt_drv',' driver_path',' printer_model ') RC =' ok
 
-    IF result == 0 THEN
-        result = CreatePrinterObject( prnt_drv, printer_model,,
-                                      port_name, queue_name, printer_title )
-    CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv',' printer_model,
-                                ',' port_name',' queue_name',' printer_title,
-                                ') RC =' result
+    IF ok == 0 THEN DO
+        ok = CreatePrinterObject( prnt_drv, printer_model,,
+                                  port_name, queue_name, printer_title )
+        CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv',' printer_model,
+                                    ',' port_name',' queue_name',' printer_title ') RC =' ok
+    END
 
-    IF result <> 0 THEN
+    IF ok <> 0 THEN
         CALL DeletePort port_name
     ELSE IF port_ok == 1 THEN DO
         CALL VRMessage VRWindow(),,
@@ -253,7 +253,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
                        NLSGetMessage( 58 ), 'W'     /* 58: Port Driver Problem */ 
     END
 
-RETURN result
+RETURN ok
 
 /*:VRX         CreatePrinter
 */
@@ -277,10 +277,16 @@ CreatePrinter: PROCEDURE EXPOSE globals.
             ok = ImportPPD( globals.!os2driver, globals.!prt_ppd )
             IF ok <> 0 THEN DO
                 CALL LINEOUT globals.!log1, 'PPD import failed:' ok
-                CALL VRMessage VRWindow(), NLSGetMessage( 69 ),,        /* 69: The printer parameters could not ... PPD file. */
-                               NLSGetMessage( 70 ), 'W'                 /* 70: Error importing PPD file */
-                CALL PromptForPMName
-                /* RETURN 1                RC=1  PPD import failed **/
+                buttons.1 = NLSGetMessage( 2 )                          /*  2: OK */
+                buttons.2 = NLSGetMessage( 3 )                          /*  3: Cancel */
+                buttons.0 = 2
+                ok = VRMessage( VRWindow(), NLSGetMessage( 69 ),,       /* 69: The printer parameters could not ... PPD file. */
+                                NLSGetMessage( 70 ), 'W',,              /* 70: Error importing PPD file */
+                                'buttons.', 1, 2 )
+                IF ok == 1 THEN
+                    CALL PromptForPMName
+                ELSE
+                    RETURN 1                /* RC=1  PPD import failed **/
             END
         END
         ELSE IF PrinterExistsInDRV( globals.!os2driver, globals.!prt_nick ) == 0 THEN DO
@@ -768,13 +774,19 @@ ImportPPD: PROCEDURE EXPOSE globals.
      * First, PPDENC converts the codepage if necessary, and copies the results
      * to our working directory.
      */
-    ADDRESS CMD '@'ppd_exe ppdfile ppd_use '2>NUL 1| RXQUEUE' nq
+    CALL LINEOUT globals.!log1, 'Converting PPD with:' ppd_exe ppdfile ppd_use
+    ADDRESS CMD '@'ppd_exe ppdfile ppd_use '2>NUL | RXQUEUE' nq
     DO QUEUED()
         PULL output
         CALL LINEOUT globals.!log2, output
     END
     CALL LINEOUT globals.!log2, ''
     CALL LINEOUT globals.!log2
+
+    IF VRFileExists( ppd_use ) == 0 THEN DO
+        CALL LINEOUT globals.!log1, 'Hmm,' ppd_use 'was not created.  Copying manually.'
+        CALL VRCopyFile ppdfile, ppd_use
+    END
 
     /* Next we strip out some problematic lines used which are often encountered
      * in (e.g.) CUPS-based PPD files.
@@ -784,7 +796,7 @@ ImportPPD: PROCEDURE EXPOSE globals.
     /* Preparation complete.  Now do the import.
      */
     count = 0
-    ADDRESS CMD '@'pin_exe 'ppd' ppddir drv_out '2>NUL 1| RXQUEUE' nq
+    ADDRESS CMD '@'pin_exe 'ppd' ppddir drv_out '2>NUL | RXQUEUE' nq
     DO QUEUED()
         PARSE PULL output
         CALL LINEOUT globals.!log2, output
@@ -862,7 +874,11 @@ ImportPPD: PROCEDURE EXPOSE globals.
     /* Finally, copy the updated driver files.
      */
     target = VRParseFilePath( driver_path, 'DP')
-    ok = VRCopyFile( workdir'\OUT\*', target )
+    CALL LINEOUT globals.!log1, 'Copying files from' workdir'\OUT to' target 
+    ADDRESS CMD '@UNLOCK' target'\'driver'.DRV 2>NUL 1>NUL'
+    ok = VRCopyFile( workdir'\OUT\'driver'.DRV', target'\'driver'.DRV')
+    IF ok == 1 THEN
+        ok = VRCopyFile( workdir'\OUT\AUXPRINT.PAK', target'\AUXPRINT.PAK')
     IF ok == 1 THEN DO
         /* Copy the updated files to \OS2\DLL\<driver>, replacing any
          * existing copies.  (This prevents problems if the OS/2 driver
@@ -872,12 +888,15 @@ ImportPPD: PROCEDURE EXPOSE globals.
         IF VRFileExists( globals.!os2dir'\DLL\'driver ) THEN DO
             CALL VRCopyFile workdir'\OUT\AUXPRINT.PAK',,
                             globals.!os2dir'\DLL\'driver'\AUXPRINT.PAK'
+            ADDRESS CMD '@UNLOCK' workdir'\OUT\'driver'.DRV 2>NUL 1>NUL'
             CALL VRCopyFile workdir'\OUT\'driver'.DRV',,
                             globals.!os2dir'\DLL\'driver'\'driver'.DRV'
         END
     END
-    IF ok == 0 THEN
+    IF ok == 0 THEN DO
+        CALL LINEOUT globals.!log1, VRError()
         RETURN 3                        /*** RC=3  Failed to copy driver files ***/
+    END
 
     CALL LINEOUT globals.!log1, newprinters.0 'printers imported successfully.'
     DO i = 1 TO newprinters.0
@@ -1618,8 +1637,8 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.97'                                  /* 12: Version %1 */
-    CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2012'                            /* 13: (C) %1 Alex Taylor */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.98'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
     CALL NLSSetText 'DT_BOOTDRIVE',  'Caption', 14, TRANSLATE( globals.!bootdrv )       /* 14: System boot volume: %1 */ 
