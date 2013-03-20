@@ -332,6 +332,7 @@ InstallPrintDriver: PROCEDURE EXPOSE globals.
     IF ( VRFileExists( targetdir'\'driver'.DRV') == 0 ) THEN DO
         CALL VRMkDir targetdir
         ok = CopyDriverToSource( driverfull, targetdir )
+        IF ok == 1 THEN ok = 0
     END
     IF VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER', 'NoClose') <> driverfull THEN
         CALL VRSetIni 'PM_DEVICE_DRIVERS', driver, driverfull||'00'x, 'USER'
@@ -355,6 +356,7 @@ CreatePrinterObject: PROCEDURE
         CALL SysMoveObject oid, '<WP_PRINTERSFOLDER>'
     ELSE
         ok = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';', 'F')
+    IF ok == 1 THEN ok = 0
 
 RETURN ok
 

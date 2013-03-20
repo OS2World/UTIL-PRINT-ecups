@@ -1,5 +1,5 @@
 CUPSWIZ - CUPS printer-creation wizard
-Version 0.97
+Version 0.99
 
   This program is simple graphical front-end for creating CUPS-based printers
   under OS/2.
@@ -100,9 +100,9 @@ LIMITATIONS & KNOWN PROBLEMS
 
   - There is no way to go 'back' in the wizard; if you need to go back and
     change a previous selection, you must cancel and start over.
-  - The program has only been tested with Gutenprint, HPLIP, and (to a limited
-    extent) foomatic-rip based printers.  Other drivers packages such as SpliX
-    or foo2qpdl may work but this is not guaranteed.
+  - The program has only been tested with Gutenprint, HPLIP, and native
+    Postscript printers with imported PPDs.  Other drivers packages such as
+    SpliX or foo2qpdl may work but this is not guaranteed.
   - If your %TMP% directory has spaces in the pathname, the program will almost
     certainly fail to work properly.  The same applies to your %LOGFILES%
     directory.
