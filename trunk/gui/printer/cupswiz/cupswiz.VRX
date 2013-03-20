@@ -250,7 +250,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     ELSE IF port_ok == 1 THEN DO
         CALL VRMessage VRWindow(),,
                        NLSGetMessage( 62 ),,        /* 62: The installed version of CUPS.PDR appears to be out of date.  As a result, the desktop printer will not be usable until the desktop is restarted. */
-                       NLSGetMessage( 58 ), 'W'     /* 58: Port Driver Problem */ 
+                       NLSGetMessage( 58 ), 'W'     /* 58: Port Driver Problem */
     END
 
 RETURN ok
@@ -874,7 +874,7 @@ ImportPPD: PROCEDURE EXPOSE globals.
     /* Finally, copy the updated driver files.
      */
     target = VRParseFilePath( driver_path, 'DP')
-    CALL LINEOUT globals.!log1, 'Copying files from' workdir'\OUT to' target 
+    CALL LINEOUT globals.!log1, 'Copying files from' workdir'\OUT to' target
     ADDRESS CMD '@UNLOCK' target'\'driver'.DRV 2>NUL 1>NUL'
     ok = VRCopyFile( workdir'\OUT\'driver'.DRV', target'\'driver'.DRV')
     IF ok == 1 THEN
@@ -933,7 +933,7 @@ Init:
 
     IF \VRIsDir( globals.!cupsdir ) THEN DO
         IF TRANSLATE( globals.!cupsdir ) <> '/R' THEN
-            CALL VRMessage VRWindow(), 
+            CALL VRMessage VRWindow(),
                            NLSGetMessage( 65, 'CUPSWIZ F:\CUPS') ||,    /* 65: CUPS could not be located ... on the command line to this program (e.g "%1"). */
                            '0d0a0d0a'x || NLSGetMessage( 66 ),,         /* 66: Only remote CUPS queues ... start this program with the /R parameter.) */
                            NLSGetMessage( 28 ), 'E'                     /* 28: CUPS Path Not Found or Not Valid */
@@ -1637,12 +1637,12 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.98'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.99'                                  /* 12: Version %1 */
     CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
-    CALL NLSSetText 'DT_BOOTDRIVE',  'Caption', 14, TRANSLATE( globals.!bootdrv )       /* 14: System boot volume: %1 */ 
-    CALL NLSSetText 'DT_CUPSPATH',   'Caption', 15, TRANSLATE( globals.!cupsdir )       /* 15: Local CUPS directory: %1 */ 
+    CALL NLSSetText 'DT_BOOTDRIVE',  'Caption', 14, TRANSLATE( globals.!bootdrv )       /* 14: System boot volume: %1 */
+    CALL NLSSetText 'DT_CUPSPATH',   'Caption', 15, TRANSLATE( globals.!cupsdir )       /* 15: Local CUPS directory: %1 */
     CALL NLSSetText 'DT_REPOSITORY', 'Caption', 16, TRANSLATE( globals.!repository )    /* 16: Local driver repository: %1 */
 
     window = VRInfo( "Object" )
@@ -1729,8 +1729,8 @@ SW_CREATE_Init:
     END
     ELSE DO                                             /* 112: No eCups-compatible OS/2 presentation drivers are installed. */
                                                         /* 113: Please install the ECUPS or ECUPS-HP printer driver before continuing. */
-        CALL VRMessage VRWindow(), 
-                       NLSGetMessage( 112 ) || '0d0a0d0a'x || NLSGetMessage( 113 ),,  
+        CALL VRMessage VRWindow(),
+                       NLSGetMessage( 112 ) || '0d0a0d0a'x || NLSGetMessage( 113 ),,
                        NLSGetMessage( 114 ), 'E'                                        /* 114: Missing PM Driver */
         CALL VRSet 'PB_CREATEOK', 'Enabled', 0
     /* TODO give an error if no drivers were found */
@@ -1782,7 +1782,7 @@ SW_MODEL_Init:
     IF best > 0 THEN
         CALL VRSet 'LB_OS2MODELS', 'Selected', best
 
-    CALL NLSSetText 'DT_MODEL1', 'Caption',, 
+    CALL NLSSetText 'DT_MODEL1', 'Caption',,
                     121, globals.!prt_nick, globals.!os2driver      /* 121: The printer "%1" could not ... to applications. */
     CALL NLSSetText 'DT_MODEL2', 'Caption', 122                     /* 122: You can select one of ... use a generic driver. */
 
