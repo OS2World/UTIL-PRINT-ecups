@@ -100,6 +100,49 @@ __VXREXX____APPENDS__:
 #append ..\..\Shared\PrintUtl.VRS
 */
 return
+/*:VRX         CheckPrograms
+*/
+CheckPrograms: PROCEDURE EXPOSE globals.
+
+    /* Make sure CUPS.PDR is installed.
+     */
+    cups_pdr = VRGetIni('PM_PORT_DRIVER', 'CUPS', 'System')
+    IF cups_pdr == '' THEN DO
+        cups_pdr = STREAM( globals.!bootdrv'\OS2\DLL\CUPS.PDR', 'C', 'QUERY EXISTS')
+        IF cups_pdr == '' THEN DO
+            CALL VRMessage VRWindow(),,
+                           NLSGetMessage( 78, globals.!bootdrv'\OS2\DLL\CUPS.PDR'),,    /*  78: The required program %1 is not installed... */  
+                           NLSGetMessage( 79 ), 'E'                                     /*  79: Missing File */
+            CALL Quit 
+        END
+        ELSE CALL VRSetIni('PM_PORT_DRIVER', 'CUPS', cups_pdr, 'System')
+    END
+
+    /* Make sure \TCPIP\BIN\CUPSLPR.EXE (required by CUPS.PDR) is installed. 
+     */
+    tcpipbin = SysSearchPath('PATH', 'inetd.exe')
+    IF tcpipbin <> '' THEN
+        tcpipbin = VRParseFileName( tcpipbin, 'DP')
+    ELSE 
+        tcpipbin = globals.!bootdrv'\TCPIP\BIN'
+    IF \VRFileExists( tcpipbin'\cupslpr.exe') & (SysSearchPath('PATH', 'cupslpr.exe') == '') THEN DO
+        CALL VRMessage VRWindow(),,
+                       NLSGetMessage( 78, 'CUPSLPR.EXE'),,
+                       NLSGetMessage( 79 ), 'E'
+        CALL Quit 
+    END
+
+    /* Make sure GZIP.EXE is installed (required for unpacking PPDs).
+     */
+    gzip_exe = SysSearchPath('PATH', 'gzip.exe')
+    IF gzip_exe == '' THEN gzip_exe = STREAM( DIRECTORY() || '\gzip.exe', 'C', 'QUERY EXISTS') 
+    IF gzip_exe == '' THEN DO
+        CALL VRMessage VRWindow(), NLSGetMessage( 78, 'GZIP.EXE'), NLSGetMessage( 79 ), 'E'
+        CALL Quit 
+    END
+
+RETURN
+
 /*:VRX         CHK_CREATEPM_Click
 */
 CHK_CREATEPM_Click: PROCEDURE
@@ -167,6 +210,15 @@ CreateCupsPrinter: PROCEDURE EXPOSE globals.
         IF model == '' THEN model = globals.!prt_ppd
         cups_cmd = cups_cmd '-v "'globals.!prt_port'" -m "'model'"'
     END
+
+    /* Temporary until we can offer user configuration:
+     */
+    PARSE UPPER VALUE VALUE('LANG',,'OS2ENVIRONMENT') WITH 1 . 4 _ctry 6 .
+    IF ( WORDPOS( _ctry, 'US CA MX BO CO VE PH CL') > 0 ) THEN
+        page = 'Letter'
+    ELSE
+        page = 'A4'
+    cups_cmd = cups_cmd '-o media='page
 
     CALL LINEOUT globals.!log1, 'Creating CUPS printer using:'
     CALL LINEOUT globals.!log1, '   ' cups_cmd
@@ -243,10 +295,33 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
                                   port_name, queue_name, printer_title )
         CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv',' printer_model,
                                     ',' port_name',' queue_name',' printer_title ') RC =' ok
+        IF ok <> 0 THEN DO
+            CALL LINEOUT globals.!log1, 'Failed to create printer object; trying again with generic driver.'
+            ok = CreatePrinterObject( prnt_drv, 'Generic Postscript Printer',,
+                                      port_name, queue_name, printer_title )
+            CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv', Generic Postscript Printer',
+                                        ',' port_name',' queue_name',' printer_title ') RC =' ok
+        END
     END
 
-    IF ok <> 0 THEN
+    IF ok <> 0 THEN DO
+        CALL LINEOUT globals.!log1, 'Printer object creation failed.'
+        IF SysIni('SYSTEM', 'PM_SPOOLER_PRINTER', 'ALL:', 'prt_keys.') == '' THEN DO
+            DO i = 1 TO prt_keys.0
+                key_val = SysIni('SYSTEM', 'PM_SPOOLER_PRINTER', prt_keys.0 )
+                PARSE VAR key_val _kport ';' _ktitle ';' .
+                IF ( _kport == port_name ) & ( _ktitle == printer_title ) THEN DO
+                    CALL LINEOUT globals.!log1, 'Cleaning INI entry:' prt_keys.0 '=' key_val
+                    CALL SysIni 'SYSTEM', 'PM_SPOOLER_PRINTER_DESCR', prt_keys.0, 'DELETE:'
+                    CALL LINEOUT globals.!log1, 'Cleaning INI entry:' prt_keys.0 '=' key_val
+                    CALL SysIni 'SYSTEM', 'PM_SPOOLER_PRINTER', prt_keys.0, 'DELETE:'
+                    LEAVE
+                END
+            END
+        END
+        CALL LINEOUT globals.!log1, 'Deleting port' port_name
         CALL DeletePort port_name
+    END
     ELSE IF port_ok == 1 THEN DO
         CALL VRMessage VRWindow(),,
                        NLSGetMessage( 62 ),,        /* 62: The installed version of CUPS.PDR appears to be out of date.  As a result, the desktop printer will not be usable until the desktop is restarted. */
@@ -292,7 +367,7 @@ CreatePrinter: PROCEDURE EXPOSE globals.
         ELSE IF PrinterExistsInDRV( globals.!os2driver, globals.!prt_nick ) == 0 THEN DO
             cups_ppd = globals.!prt_ppd
             IF cups_ppd == '' THEN
-                cups_ppd = STREAM( globals.!cupsdir'\etc\cups\ppd'globals.!prt_name'.ppd', 'C', 'QUERY EXISTS')
+                cups_ppd = STREAM( globals.!cupsdir'\etc\cups\ppd\'globals.!prt_name'.ppd', 'C', 'QUERY EXISTS')
             IF cups_ppd == '' THEN
                 CALL PromptForPMName
             ELSE DO
@@ -928,6 +1003,7 @@ Init:
 
     CALL LoadSettings
     CALL SetLanguage
+    CALL CheckPrograms
 
     IF InitArgs.0 > 0 THEN globals.!cupsdir = InitArgs.1
 
@@ -1637,7 +1713,7 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '0.99'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.00'                                  /* 12: Version %1 */
     CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
