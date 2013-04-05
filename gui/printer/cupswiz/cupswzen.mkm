@@ -41,7 +41,7 @@ CWZ0030I: Looking for connected printers.  Please wait...
 CWZ0031I: Select the connection for this printer.
 CWZ0032I: Detected network printer (%1) "%2" at %3
 CWZ0033I: Detected network printer %1 at %2
-CWZ0034I: Network printer (manual configuration)
+CWZ0034I: Other printer (manual configuration)
 CWZ0035I: Local printer: %1
 CWZ0036?:
 CWZ0037?:
@@ -91,8 +91,8 @@ CWZ0074I: Missing required value(s)
 CWZ0075I: Missing Value(s)
 CWZ0076I: Could not read printer name from %1.
 CWZ0077I: Invalid PPD
-CWZ0078?:
-CWZ0079?:
+CWZ0078I: The required program %1 is not installed.  Please check your installation or contact support.
+CWZ0079I: Missing File
 ;
 ; Network settings dialog
 CWZ0080I: Network Printer

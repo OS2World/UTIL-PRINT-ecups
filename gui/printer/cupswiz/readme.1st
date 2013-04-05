@@ -1,5 +1,5 @@
 CUPSWIZ - CUPS printer-creation wizard
-Version 0.99
+Version 1.01
 
   This program is simple graphical front-end for creating CUPS-based printers
   under OS/2.
@@ -56,7 +56,8 @@ REQUIREMENTS
    CUPS.PDR (the eCups port driver) must be installed.  In addition, it 
    should have a bldlevel of 1.03 (February 2011) or later.  (With earlier
    versions, you will be required to restart the WPS after creating a 
-   printer.)
+   printer.)  This also requires CUPSLPR.EXE to be installed on your PATH
+   (preferably in the \TCPIP\BIN directory).
 
    (If you installed CUPS on your system from WarpIN packages, all of the
    above requirements should be fulfilled.)
