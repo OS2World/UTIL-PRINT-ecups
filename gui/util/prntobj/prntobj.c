@@ -18,6 +18,63 @@
 #define MAX_DEVICE_NAME     9
 
 
+/* ------------------------------------------------------------------------- *
+ * UniqueDeviceName                                                          *
+ *                                                                           *
+ * Check (and, if necessary, modify) the specified print device name to make *
+ * sure it is unique.                                                        *
+ *                                                                           *
+ * ARGUMENTS:                                                                *
+ *   PSZ pszName : Pointer to device name buffer (9-byte CHAR buffer)        *
+ *                                                                           *
+ * RETURNS: ULONG                                                            *
+ *   0 on success, 1 if no unique name could be generated, or the return     *
+ *   code from SplEnumDevice() if an error occurred.                         *
+ * ------------------------------------------------------------------------- */
+ULONG UniqueDeviceName( PSZ pszName )
+{
+    PBYTE     pBuf;
+    PPRDINFO3 pprd3;
+    CHAR      szNumber[ MAX_DEVICE_NAME ] = {0};
+    ULONG     i, n, pos,
+              ulNumber  = 0,
+              ulAvail   = 0,
+              cbBuf     = 0;
+    BOOL      fUnique   = FALSE;
+    SPLERR    rc;
+
+
+    rc = SplEnumDevice( NULL, 3, NULL, 0, &ulNumber, &ulAvail, &cbBuf, NULL );
+    if ( rc == ERROR_MORE_DATA || rc == NERR_BufTooSmall ) {
+        pBuf = malloc( cbBuf );
+        if ( pBuf ) {
+            rc = SplEnumDevice( NULL, 3, pBuf, cbBuf, &ulNumber, &ulAvail, &cbBuf, NULL );
+            if ( rc == NO_ERROR ) {
+                n = 1;
+                while ( !fUnique && ( n < 999 )) {     // max 999 as a sanity check
+                    for ( i = 0; i < ulNumber; i++ )  {
+                        pprd3 = (PPRDINFO3) pBuf + i;
+                        if ( stricmp( pszName, pprd3->pszPrinterName ) == 0 ) break;
+                    }
+                    if ( i >= ulNumber ) fUnique = TRUE;
+                    else {
+                        sprintf( szNumber, "%u", n++ );
+                        pos = strlen( pszName ) - strlen( szNumber );
+                        pszName[ pos ] = '\0';
+                        strncat( pszName, szNumber, MAX_DEVICE_NAME-1 );
+                    }
+                }
+            }
+            free( pBuf );
+        }
+    }
+    if ( rc == NO_ERROR && !fUnique ) return 1;
+    else return rc;
+}
+
+
+/* ------------------------------------------------------------------------- *
+ * ------------------------------------------------------------------------- */
 int main( int argc, char *argv[] )
 {
     PRDINFO3  devinfo       = {0};
@@ -48,29 +105,21 @@ int main( int argc, char *argv[] )
 
     // Generate a suitable internal device name
     strncpy( szDeviceName, pszQueueName, MAX_DEVICE_NAME-1 );
-    i = 1;
-    len = strlen( szDeviceName );
-    rc = SplQueryDevice( NULL, szDeviceName, 0, NULL, 0, &cbBuf );
-    while (( rc != NERR_DestNotFound) && ( i < 10 )) {
-        szDeviceName[len-1] = '0' + i;
-        rc = SplQueryDevice( NULL, szDeviceName, 0, NULL, 0, &cbBuf );
+    if (( rc = UniqueDeviceName( szDeviceName )) != NO_ERROR ) {
+        printf("Failed to get unique device name: rc=%u\n", rc);
+        return 0;
     }
-    if ( rc == NERR_DestNotFound ) {
-        devinfo.pszPrinterName = szDeviceName;
-        devinfo.pszUserName    = NULL;
-        devinfo.pszLogAddr     = pszPortName;
-        devinfo.pszComment     = pszTitle;
-        devinfo.pszDrivers     = pszModel;
-        devinfo.usTimeOut      = 45;
-        rc = SplCreateDevice( NULL, 3, &devinfo, sizeof( devinfo ));
-        if ( rc != NO_ERROR ) {
-            printf("Failed to create device: SplCreateDevice() returned %u\n", rc);
-            return ( rc );
-        }
-    }
-    else {
-        printf("Failed to get unique device name: SplQueryDevice() returned %u\n", rc);
-        return ( rc );
+
+    devinfo.pszPrinterName = szDeviceName;
+    devinfo.pszUserName    = NULL;
+    devinfo.pszLogAddr     = pszPortName;
+    devinfo.pszComment     = pszTitle;
+    devinfo.pszDrivers     = pszModel;
+    devinfo.usTimeOut      = 45;
+    rc = SplCreateDevice( NULL, 3, &devinfo, sizeof( devinfo ));
+    if ( rc != NO_ERROR ) {
+        printf("Failed to create device: SplCreateDevice() returned %u\n", rc);
+        return rc;
     }
 
     // Create the queue
@@ -85,7 +134,7 @@ int main( int argc, char *argv[] )
     if ( rc != NO_ERROR ) {
         printf("Failed to create printer: SplCreateQueue() returned %u", rc);
         SplDeleteDevice( NULL, szDeviceName );
-        return ( rc );
+        return rc;
     }
 
     return 0;
