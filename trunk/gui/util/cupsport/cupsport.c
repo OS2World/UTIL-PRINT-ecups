@@ -49,9 +49,6 @@ typedef struct _PORTSETTINGS {
 #define TYPE_LONG_WAIT   2
 #define BIDI_SET_PORTDRV 0x19
 
-#pragma import ( PrtSet,, "PMSPL", 604 )
-extern ULONG APIENTRY PrtSet( PSZ pszComputerName, PSZ pszDeviceName, ULONG ulType, ULONG ulCommand, PVOID pInData, ULONG cbInData );
-
 
 int main( int argc, char *argv[] )
 {
@@ -125,13 +122,8 @@ int main( int argc, char *argv[] )
     /* Now update the port driver settings */
     strncpy( settings.szHost, pszHostName, STR_LEN_HOSTNAME );
     strncpy( settings.szQueue, pszPrinterName, STR_LEN_QUEUENAME );
-#if 1
     ulRC = pfn_CupsSet( pszPortName, TYPE_LONG_WAIT, BIDI_SET_PORTDRV,
                         &settings, sizeof( settings ));
-#else
-    ulRC = PrtSet( NULL, pszPortName, TYPE_LONG_WAIT, BIDI_SET_PORTDRV,
-                   &settings, sizeof( settings ));
-#endif
     if ( ulRC ) {
         printf("Failed to update port settings, RC=0x%X.\n", ulRC );
         goto finish;

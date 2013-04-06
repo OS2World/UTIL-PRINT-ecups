@@ -125,6 +125,8 @@ RETURN 1
  *
  *   driver    - The fully-qualified filename of the printerpak driver
  *   newdrvdir - The directory where the files will be copied; must exist
+ *
+ * Returns: 1 on success, 0 on failure
  */
 CopyDriverToSource: PROCEDURE EXPOSE globals.
     PARSE ARG driver, newdrvdir
@@ -323,20 +325,25 @@ RETURN queuename
  *   driver     - The name of the printerpak driver (without path or extension)
  *   driverfull - The fully-qualified filename of the printerpak driver
  *   model      - The printer make/model name used by the driver
+ *
+ * Returns: 0 on success, 1 on error
  */
 InstallPrintDriver: PROCEDURE EXPOSE globals.
     PARSE ARG driver, driverfull, model
 
     ok = 0
     targetdir = globals.!os2dir'\DLL\'driver
-    IF ( VRFileExists( targetdir'\'driver'.DRV') == 0 ) THEN DO
+    targetdrv = targetdir'\'driver'.DRV'
+    IF ( VRFileExists( targetdrv ) == 0 ) THEN DO
         CALL VRMkDir targetdir
-        ok = CopyDriverToSource( driverfull, targetdir )
-        IF ok == 1 THEN ok = 0
+        r = CopyDriverToSource( driverfull, targetdir )
+        IF r <> 1 THEN ok = 1
     END
-    IF VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER', 'NoClose') <> driverfull THEN
-        CALL VRSetIni 'PM_DEVICE_DRIVERS', driver, driverfull||'00'x, 'USER'
-    CALL VRSetIni 'PM_SPOOLER_DD', driver'.'model, driver'.DRV;;;'||'00'x, 'SYSTEM'
+    IF ok == 0 THEN DO
+        IF VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER') <> targetdrv THEN
+            CALL VRSetIni 'PM_DEVICE_DRIVERS', driver, targetdrv||'00'x, 'USER'
+        CALL VRSetIni 'PM_SPOOLER_DD', driver'.'model, driver'.DRV;;;'||'00'x, 'SYSTEM'
+    END
 RETURN ok
 
 
@@ -344,21 +351,34 @@ RETURN ok
 */
 /* Create the specified printer using SysCreateObject (this should create the
  * queue automatically).
+ *
+ * Returns: 0 on success or non-zero return code on error.
  */
-CreatePrinterObject: PROCEDURE
+CreatePrinterObject: PROCEDURE EXPOSE globals.
     PARSE ARG driver, model, portname, queuename, printername
 
+    CALL LINEOUT globals.!log1, 'Creating new printer:' printername '('queuename')'
+    ADDRESS CMD '@prntobj' queuename portname '"'driver'.'model'" "'printername'" >>' globals.!log2
+/*
     oid = '<WPPO_'queuename'>'
     setup = 'PORTNAME='portname';PRINTDRIVER='driver'.'model';QUEUENAME='queuename';TAKEDEFAULTS=YES'
-
+    CALL LINEOUT globals.!log1, 'Creating printer object "'printername'" with setup string "'setup';OBJECTID='oid';"'
     ok = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';OBJECTID='oid';', 'F')
     IF ok == 1 THEN
         CALL SysMoveObject oid, '<WP_PRINTERSFOLDER>'
-    ELSE
+    ELSE DO
+        CALL LINEOUT globals.!log1, ' - creation failed, trying again without object-ID ...'
         ok = SysCreateObject('WPPrinter', printername, '<WP_DESKTOP>', setup';', 'F')
+    END
     IF ok == 1 THEN ok = 0
+    ELSE DO
+        CALL LINEOUT globals.!log1, ' - unable to create object!'
+        ok = 1
+    END
+    CALL LINEOUT globals.!log1
+*/
 
-RETURN ok
+RETURN rc
 
 
 /*:VRX         RSPCreatePort
@@ -514,6 +534,17 @@ CleanPPD: PROCEDURE
             WHEN LEFT( line, 7  ) == '*StpStp'            THEN NOP
             WHEN LEFT( line, 18 ) == '*StpResolutionMap:' THEN NOP
             WHEN LEFT( line, 14 ) == '*OPOptionHints'     THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*de.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*es.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*fr.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*it.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*ja.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*ko.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*nl.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*pt.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*sv.'               THEN NOP
+            WHEN LEFT( line, 7 ) ==  '*zh_CN.'            THEN NOP
+            WHEN LEFT( line, 7 ) ==  '*zh_TW.'            THEN NOP
             WHEN LEFT( line, 9  ) == '*Foomatic'          THEN DO
                 line = STRIP( line )
                 IF RIGHT( line, 2 ) == '&&' THEN skip_next = 1

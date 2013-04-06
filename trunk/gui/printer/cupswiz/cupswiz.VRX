@@ -141,6 +141,24 @@ CheckPrograms: PROCEDURE EXPOSE globals.
         CALL Quit 
     END
 
+    /* Make sure CUPSPORT.EXE is installed.
+     */
+    port_exe = SysSearchPath('PATH', 'cupsport.exe')
+    IF port_exe == '' THEN port_exe = STREAM( DIRECTORY() || '\cupsport.exe', 'C', 'QUERY EXISTS') 
+    IF port_exe == '' THEN DO
+        CALL VRMessage VRWindow(), NLSGetMessage( 78, 'CUPSPORT.EXE'), NLSGetMessage( 79 ), 'E'
+        CALL Quit 
+    END
+
+    /* Make sure PRNTOBJ.EXE is installed.
+     */
+    prntobj_exe = SysSearchPath('PATH', 'prntobj.exe')
+    IF prntobj_exe == '' THEN prntobj_exe = STREAM( DIRECTORY() || '\prntobj.exe', 'C', 'QUERY EXISTS') 
+    IF prntobj_exe == '' THEN DO
+        CALL VRMessage VRWindow(), NLSGetMessage( 78, 'PRNTOBJ.EXE'), NLSGetMessage( 79 ), 'E'
+        CALL Quit 
+    END
+
 RETURN
 
 /*:VRX         CHK_CREATEPM_Click
@@ -275,8 +293,8 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
         RETURN 1
     END
 
-    /* Create a new CUPS port. */
-    /* TODO currently this assumes that CUPS.PDR is already installed. */
+    /* Create a new CUPS port. 
+     */
     port_ok = AddPort_CUPS( port_name, host, printer )
     IF port_ok > 1 THEN
         RETURN 1
@@ -1713,7 +1731,7 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.00'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.01'                                  /* 12: Version %1 */
     CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
