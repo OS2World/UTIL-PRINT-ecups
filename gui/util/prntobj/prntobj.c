@@ -66,10 +66,11 @@ ULONG UniqueDeviceName( PSZ pszName )
                 }
             }
             free( pBuf );
+            if ( rc == NO_ERROR && !fUnique ) return 1;
         }
     }
-    if ( rc == NO_ERROR && !fUnique ) return 1;
-    else return rc;
+    else if ( rc == NO_ERROR ) fUnique = TRUE;
+    return rc;
 }
 
 
@@ -107,7 +108,7 @@ int main( int argc, char *argv[] )
     strncpy( szDeviceName, pszQueueName, MAX_DEVICE_NAME-1 );
     if (( rc = UniqueDeviceName( szDeviceName )) != NO_ERROR ) {
         printf("Failed to get unique device name: rc=%u\n", rc);
-        return 0;
+        return rc;
     }
 
     devinfo.pszPrinterName = szDeviceName;
