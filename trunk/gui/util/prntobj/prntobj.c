@@ -96,7 +96,7 @@ int main( int argc, char *argv[] )
         printf("  <port>         The output port to use, e.g. \"LPT2\" (must exist)\n");
         printf("  <driver.model> The printer driver/model, e.g. \"PSCRIPT.HP Laserjet 4L\"\n");
         printf("  <title>        Descriptive name to use as the object title\n");
-        printf("\nExample:\n  prntobj GENERICP SLPR2 \"PSCRIPT.Generic Postscript Printer\" \"My Printer\"\n");
+        printf("\nExample:\n  prntobj GenericP SLPR2 \"PSCRIPT.Generic Postscript Printer\" \"My Printer\"\n");
         return 1;
     }
     pszQueueName = argv[ 1 ];
@@ -117,6 +117,7 @@ int main( int argc, char *argv[] )
     devinfo.pszComment     = pszTitle;
     devinfo.pszDrivers     = pszModel;
     devinfo.usTimeOut      = 45;
+    printf("Creating print device %s for port %s\n", szDeviceName, pszPortName );
     rc = SplCreateDevice( NULL, 3, &devinfo, sizeof( devinfo ));
     if ( rc != NO_ERROR ) {
         printf("Failed to create device: SplCreateDevice() returned %u\n", rc);
@@ -124,6 +125,7 @@ int main( int argc, char *argv[] )
     }
 
     // Create the queue
+    if ( strlen( pszQueueName ) > 8 ) pszQueueName[8] = '\0';
     qinfo.pszName       = pszQueueName;
     qinfo.uPriority     = PRQ_DEF_PRIORITY;
     qinfo.fsType        = PRQ3_TYPE_RAW;
@@ -131,6 +133,7 @@ int main( int argc, char *argv[] )
     qinfo.pszComment    = pszTitle;
     qinfo.pszPrinters   = szDeviceName;
     qinfo.pszDriverName = pszModel;
+    printf("Creating printer queue %s\n", pszQueueName );
     rc = SplCreateQueue( NULL, 3, &qinfo, sizeof( qinfo ));
     if ( rc != NO_ERROR ) {
         printf("Failed to create printer: SplCreateQueue() returned %u", rc);
