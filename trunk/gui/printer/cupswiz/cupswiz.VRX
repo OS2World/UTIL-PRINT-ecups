@@ -476,7 +476,7 @@ RETURN
 
 /*:VRX         EF_SERVER_LostFocus
 */
-EF_SERVER_LostFocus: PROCEDURE EXPOSE globals.
+EF_SERVER_LostFocus: PROCEDURE EXPOSE globals. network_dialog
 
     idx = VRGet('DDCB_PROTOCOL', 'Selected')
     which = VRMethod('DDCB_PROTOCOL', 'GetItemData', idx )
@@ -487,6 +487,10 @@ EF_SERVER_LostFocus: PROCEDURE EXPOSE globals.
     IF server == '' THEN RETURN
 
     IF GetCupsQueues( server ) == 0 THEN RETURN
+
+    /* Sanity check to make sure the dialog wasn't dismissed before lpstat returned */
+    IF network_dialog <> 1 THEN RETURN
+
     CALL VRMethod 'DDCB_CUPSQUEUES', 'AddStringList', 'cupsdest.'
 RETURN
 
@@ -1348,7 +1352,7 @@ PB_NETOK_Click: PROCEDURE EXPOSE globals. port
     which = VRMethod('DDCB_PROTOCOL', 'GetItemData', idx )
     server = STRIP( VRGet("EF_SERVER",      "Value"))
     pqueue = STRIP( VRGet("EF_QUEUE",       "Value"))
-    cqueue = STRIP( VRGet("DDCB_CUPSQUEUE", "Value"))
+    cqueue = STRIP( VRGet("DDCB_CUPSQUEUES","Value"))
     userid = STRIP( VRGet("EF_USERID",      "Value"))
     passwd = STRIP( VRGet("EF_PASSWORD",    "Value"))
 
@@ -1973,6 +1977,9 @@ return
 /*:VRX         SW_NETWORK_Fini
 */
 SW_NETWORK_Fini:
+
+    network_dialog = 0
+
     window = VRInfo( "Window" )
     call VRDestroy window
     drop window
@@ -1980,6 +1987,9 @@ return
 /*:VRX         SW_NETWORK_Init
 */
 SW_NETWORK_Init:
+
+    /* Flag to keep track of whether dialog is open */
+    network_dialog = 1
 
     CALL NLSSetText 'SW_NETWORK',   'Caption',  80    /* 80: Network Printer */
     CALL NLSSetText 'DT_PROTOCOL',  'Caption',  81    /* 81: Network protocol: */
