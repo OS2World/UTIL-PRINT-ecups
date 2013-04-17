@@ -1,5 +1,5 @@
 CUPSWIZ - CUPS printer-creation wizard
-Version 1.01
+Version 1.02
 
   This program is simple graphical front-end for creating CUPS-based printers
   under OS/2.
@@ -71,8 +71,8 @@ REQUIREMENTS
 INSTALLATION
 
   1. Place CUPSWIZ.EXE into a suitable directory.  
-  2. Place CUPSPORT.EXE either in the same directory as CUPSWIZ.EXE, or else
-     in a directory on the PATH.
+  2. Place CUPSPORT.EXE and PRNTOBJ.EXE either in the same directory as
+     CUPSWIZ.EXE, or else in a directory on the PATH.
 
 
 USAGE
