@@ -111,52 +111,52 @@ CheckPrograms: PROCEDURE EXPOSE globals.
         cups_pdr = STREAM( globals.!bootdrv'\OS2\DLL\CUPS.PDR', 'C', 'QUERY EXISTS')
         IF cups_pdr == '' THEN DO
             CALL VRMessage VRWindow(),,
-                           NLSGetMessage( 78, globals.!bootdrv'\OS2\DLL\CUPS.PDR'),,    /*  78: The required program %1 is not installed... */  
+                           NLSGetMessage( 78, globals.!bootdrv'\OS2\DLL\CUPS.PDR'),,    /*  78: The required program %1 is not installed... */
                            NLSGetMessage( 79 ), 'E'                                     /*  79: Missing File */
-            CALL Quit 
+            CALL Quit
         END
         ELSE CALL VRSetIni('PM_PORT_DRIVER', 'CUPS', cups_pdr, 'System')
     END
 
-    /* Make sure \TCPIP\BIN\CUPSLPR.EXE (required by CUPS.PDR) is installed. 
+    /* Make sure \TCPIP\BIN\CUPSLPR.EXE (required by CUPS.PDR) is installed.
      */
     tcpipbin = SysSearchPath('PATH', 'inetd.exe')
     IF tcpipbin <> '' THEN
         tcpipbin = VRParseFileName( tcpipbin, 'DP')
-    ELSE 
+    ELSE
         tcpipbin = globals.!bootdrv'\TCPIP\BIN'
     IF \VRFileExists( tcpipbin'\cupslpr.exe') & (SysSearchPath('PATH', 'cupslpr.exe') == '') THEN DO
         CALL VRMessage VRWindow(),,
                        NLSGetMessage( 78, 'CUPSLPR.EXE'),,
                        NLSGetMessage( 79 ), 'E'
-        CALL Quit 
+        CALL Quit
     END
 
     /* Make sure GZIP.EXE is installed (required for unpacking PPDs).
      */
     gzip_exe = SysSearchPath('PATH', 'gzip.exe')
-    IF gzip_exe == '' THEN gzip_exe = STREAM( DIRECTORY() || '\gzip.exe', 'C', 'QUERY EXISTS') 
+    IF gzip_exe == '' THEN gzip_exe = STREAM( DIRECTORY() || '\gzip.exe', 'C', 'QUERY EXISTS')
     IF gzip_exe == '' THEN DO
         CALL VRMessage VRWindow(), NLSGetMessage( 78, 'GZIP.EXE'), NLSGetMessage( 79 ), 'E'
-        CALL Quit 
+        CALL Quit
     END
 
     /* Make sure CUPSPORT.EXE is installed.
      */
     port_exe = SysSearchPath('PATH', 'cupsport.exe')
-    IF port_exe == '' THEN port_exe = STREAM( DIRECTORY() || '\cupsport.exe', 'C', 'QUERY EXISTS') 
+    IF port_exe == '' THEN port_exe = STREAM( DIRECTORY() || '\cupsport.exe', 'C', 'QUERY EXISTS')
     IF port_exe == '' THEN DO
         CALL VRMessage VRWindow(), NLSGetMessage( 78, 'CUPSPORT.EXE'), NLSGetMessage( 79 ), 'E'
-        CALL Quit 
+        CALL Quit
     END
 
     /* Make sure PRNTOBJ.EXE is installed.
      */
     prntobj_exe = SysSearchPath('PATH', 'prntobj.exe')
-    IF prntobj_exe == '' THEN prntobj_exe = STREAM( DIRECTORY() || '\prntobj.exe', 'C', 'QUERY EXISTS') 
+    IF prntobj_exe == '' THEN prntobj_exe = STREAM( DIRECTORY() || '\prntobj.exe', 'C', 'QUERY EXISTS')
     IF prntobj_exe == '' THEN DO
         CALL VRMessage VRWindow(), NLSGetMessage( 78, 'PRNTOBJ.EXE'), NLSGetMessage( 79 ), 'E'
-        CALL Quit 
+        CALL Quit
     END
 
 RETURN
@@ -293,7 +293,7 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
         RETURN 1
     END
 
-    /* Create a new CUPS port. 
+    /* Create a new CUPS port.
      */
     port_ok = AddPort_CUPS( port_name, host, printer )
     IF port_ok > 1 THEN
@@ -417,6 +417,7 @@ DDCB_PROTOCOL_Change: PROCEDURE EXPOSE globals.
             show_queue = 1
             show_user  = 1
             show_pass  = 1
+            show_pick  = 0
             server_caption = 82          /* 82: Printer or server address: */
             queue_caption  = 84          /* 84: Printer queue name: */
             userid_caption = 86          /* 86: User ID: */
@@ -425,6 +426,7 @@ DDCB_PROTOCOL_Change: PROCEDURE EXPOSE globals.
             show_queue = 0
             show_user  = 0
             show_pass  = 0
+            show_pick  = 0
             server_caption = 82          /* 82: Printer or server address: */
             queue_caption  = 84          /* 84: Printer queue name: */
             userid_caption = 86          /* 86: User ID: */
@@ -433,6 +435,7 @@ DDCB_PROTOCOL_Change: PROCEDURE EXPOSE globals.
             show_queue = 1
             show_user  = 1
             show_pass  = 0
+            show_pick  = 0
             server_caption = 82          /* 82: Printer or server address: */
             queue_caption  = 84          /* 84: Printer queue name: */
             userid_caption = 87          /* 87: User ID (if required): */
@@ -441,14 +444,16 @@ DDCB_PROTOCOL_Change: PROCEDURE EXPOSE globals.
             show_queue = 1
             show_user  = 1
             show_pass  = 1
+            show_pick  = 0
             server_caption = 83          /* 83: Print server name: */
             queue_caption  = 85          /* 85: Shared printer name: */
             userid_caption = 86          /* 86: User ID: */
         END
         OTHERWISE DO                /* CUPS */
-            show_queue = 1
+            show_queue = 0
             show_user  = 0
             show_pass  = 0
+            show_pick  = 1
             server_caption = 88          /* 88: CUPS server name: */
             queue_caption  = 89          /* 89: CUPS printer name: */
             userid_caption = 86          /* 86: User ID: */
@@ -459,13 +464,30 @@ DDCB_PROTOCOL_Change: PROCEDURE EXPOSE globals.
     r = NLSSetText('DT_QUEUE',  'Caption', queue_caption )
     r = NLSSetText('DT_USERID', 'Caption', userid_caption )
 
-    CALL VRSet 'DT_QUEUE',    'Visible', show_queue
-    CALL VRSet 'EF_QUEUE',    'Visible', show_queue
-    CALL VRSet 'DT_USERID',   'Visible', show_user
-    CALL VRSet 'EF_USERID',   'Visible', show_user
-    CALL VRSet 'DT_PASSWORD', 'Visible', show_pass
-    CALL VRSet 'EF_PASSWORD', 'Visible', show_pass
+    CALL VRSet 'DT_QUEUE',       'Visible', show_queue | show_pick
+    CALL VRSet 'EF_QUEUE',       'Visible', show_queue
+    CALL VRSet 'DT_USERID',      'Visible', show_user
+    CALL VRSet 'EF_USERID',      'Visible', show_user
+    CALL VRSet 'DT_PASSWORD',    'Visible', show_pass
+    CALL VRSet 'EF_PASSWORD',    'Visible', show_pass
+    CALL VRSet 'DDCB_CUPSQUEUES','Visible', show_pick
 
+RETURN
+
+/*:VRX         EF_SERVER_LostFocus
+*/
+EF_SERVER_LostFocus: PROCEDURE EXPOSE globals.
+
+    idx = VRGet('DDCB_PROTOCOL', 'Selected')
+    which = VRMethod('DDCB_PROTOCOL', 'GetItemData', idx )
+    IF which <> 5 THEN RETURN
+
+    CALL VRMethod 'DDCB_CUPSQUEUES', 'Clear'
+    server = STRIP( VRGet("EF_SERVER", "Value"))
+    IF server == '' THEN RETURN
+
+    IF GetCupsQueues( server ) == 0 THEN RETURN
+    CALL VRMethod 'DDCB_CUPSQUEUES', 'AddStringList', 'cupsdest.'
 RETURN
 
 /*:VRX         ExecRINSTPRN
@@ -504,8 +526,8 @@ GetCupsPorts: PROCEDURE EXPOSE globals.
 
     CALL NLSSetText 'DT_INFO', 'Caption', 30        /* 30: Looking for connected printers.  Please wait... */
 
-    lpinfo_cmd = globals.!cupsdir'\sbin\lpinfo.exe -v |rxqueue'
-    snmp_cmd   = globals.!cupsdir'\lib\cups\backend\snmp.exe |rxqueue'
+    lpinfo_cmd = globals.!cupsdir'\sbin\lpinfo.exe -v 2>&1 |rxqueue'
+    snmp_cmd   = globals.!cupsdir'\lib\cups\backend\snmp.exe 2>&1 |rxqueue'
 
     _od = DIRECTORY()
     CALL DIRECTORY globals.!cupsdir
@@ -701,6 +723,46 @@ GetCupsPrinters: PROCEDURE EXPOSE globals. manufacturers.
     manufacturers.0 = count
 
 RETURN
+
+/*:VRX         GetCupsQueues
+*/
+GetCupsQueues: PROCEDURE EXPOSE globals. cupsdest.
+    ARG hostaddr
+
+    /* Try to find lpstat.exe */
+    lpstat_exe = STREAM( globals.!cupsdir'\bin\lpstat.exe', 'C', 'QUERY EXISTS')
+    IF lpstat_exe == '' THEN lpstat_exe = STREAM( globals.!mydir'\lpstat.exe', 'C', 'QUERY EXISTS')
+    IF lpstat_exe == '' THEN lpstat_exe = STREAM( DIRECTORY()'\lpstat.exe', 'C', 'QUERY EXISTS')
+    IF lpstat_exe == '' THEN lpstat_exe = SysSearchPath('PATH', 'lpstat.exe')
+    IF lpstat_exe == '' THEN RETURN 0
+
+    sq = RXQUEUE('CREATE')
+    oq = RXQUEUE('SET', sq )
+
+    CALL VRSet VRWindow(), 'Pointer', 'WAIT'
+    ADDRESS CMD '@'lpstat_exe '-h' hostaddr '-p -c 2>&1 |rxqueue' sq
+    CALL VRSet VRWindow(), 'Pointer', '<default>'
+
+    _count = 0
+    DO QUEUED()
+        PARSE PULL _info
+        IF _info == '' THEN ITERATE
+        IF _info == 'lpstat: Connection refused' THEN LEAVE
+        IF WORD( _info, 1 ) == 'printer' THEN
+            PARSE VAR _info 'printer' _qname .
+        ELSE IF WORD( info, 1 ) == 'class' THEN
+            PARSE VAR _info 'class' _qname .
+        ELSE ITERATE
+        IF _qname == '' THEN ITERATE
+        _count = _count + 1
+        cupsdest._count = _qname
+    END
+    CALL RXQUEUE 'DELETE', sq
+    CALL RXQUEUE 'SET', oq
+
+    cupsdest.0 = _count
+
+RETURN _count
 
 /*:VRX         Halt
 */
@@ -1284,10 +1346,11 @@ PB_NETOK_Click: PROCEDURE EXPOSE globals. port
 
     idx = VRGet('DDCB_PROTOCOL', 'Selected')
     which = VRMethod('DDCB_PROTOCOL', 'GetItemData', idx )
-    server = STRIP( VRGet("EF_SERVER",   "Value"))
-    pqueue = STRIP( VRGet("EF_QUEUE",    "Value"))
-    userid = STRIP( VRGet("EF_USERID",   "Value"))
-    passwd = STRIP( VRGet("EF_PASSWORD", "Value"))
+    server = STRIP( VRGet("EF_SERVER",      "Value"))
+    pqueue = STRIP( VRGet("EF_QUEUE",       "Value"))
+    cqueue = STRIP( VRGet("DDCB_CUPSQUEUE", "Value"))
+    userid = STRIP( VRGet("EF_USERID",      "Value"))
+    passwd = STRIP( VRGet("EF_PASSWORD",    "Value"))
 
     invalid = 0
 
@@ -1324,10 +1387,10 @@ PB_NETOK_Click: PROCEDURE EXPOSE globals. port
             END
             uri = uri || server'/'pqueue
         END
-        OTHERWISE DO
-            IF server == '' | pqueue == '' THEN invalid = 1
+        OTHERWISE DO                /* Existing CUPS */
+            IF server == '' | cqueue == '' THEN invalid = 1
             ELSE DO
-                globals.!remotecups = server pqueue
+                globals.!remotecups = server cqueue
                 uri = ''
             END
         END
@@ -1731,7 +1794,7 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.01'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.02'                                  /* 12: Version %1 */
     CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
