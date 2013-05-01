@@ -1,0 +1,808 @@
+/*:VRX         DriverIsInstalled
+*/
+/* Checks if a given print driver (without extension) is installed, and if so
+ * returns the path to the active files.  Returns '' if the driver is not
+ * installed.
+ */
+DriverIsInstalled: PROCEDURE
+    ARG driver
+    PARSE VALUE VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER') WITH drv_path '00'x .
+    IF ( drv_path <> '') THEN
+        drv_path = STREAM( drv_path, 'C', 'QUERY EXISTS')
+RETURN drv_path
+
+
+/*:VRX         GetDriverSource
+*/
+/* Figure out where to look for the PrinterPak driver files used as the install
+ * source.  Preference is given to the local repository (PDR_DIR); if it's not
+ * there, we look in a couple of other places where it might have ended up.
+ * Note that we don't look for the actual installed driver files under \OS2\DLL;
+ * that logic is handled in LocateDriverFiles(), which calls this routine.
+ *
+ * Various global values are assumed to be set already:
+ * - globals.!prdrv:      filespec of \OS2\INSTALL\PRDRV.LST
+ * - globals.!repository: value indicated by PM_INSTALL->PDR_DIR in OS2.INI
+ *
+ * Returns the path, or '' if not found.  Also, 'pmdx' will be 0-9 if the
+ * driver is in the repository (indicating the repository subdirectory), or
+ * '' if the driver is not in the repository.
+ */
+GetDriverSource: PROCEDURE EXPOSE globals. pmdx
+    ARG driver
+    IF driver == '' THEN RETURN ''
+
+    drv_file = ''
+    IF globals.!repository <> '' THEN DO
+
+        /* See if the driver is defined in the local repository.  (This is the
+         * directory where installable printer drivers are kept.  OS/2 gets them
+         * from here when you select 'Printer driver included with OS/2'.)
+         */
+        pmdx = GetDriverPMDD( driver, globals.!prdrv )
+        IF pmdx == '' THEN DO
+            /* Hmm, the driver isn't listed in PRDRV.LST.  Let's check to see if
+             * it's in the default repository location anyway.
+             */
+            IF WORDPOS( driver, 'ECUPS ECUPS-HP PSPRINT PSPRINT2') > 0 THEN
+                pmdx = '9'
+            ELSE
+                pmdx = '0'
+            drv_file = STREAM( globals.!repository'\PMDD_'pmdx'\'driver'.DRV', 'C', 'QUERY EXISTS')
+            IF drv_file <> '' THEN DO
+                /* We found the driver in the repository, even though it isn't
+                 * defined as such.  So let's add the proper definition to
+                 * PRDRV.LST now.
+                 */
+                CALL LINEOUT globals.!prdrv, LEFT( driver'.DRV', 14 ) pmdx ||,
+                             '  (added automatically)'
+                CALL LINEOUT globals.!prdrv
+            END
+            ELSE
+                pmdx = ''
+        END
+        ELSE DO
+            /* The driver is listed; now make sure it's actually there.
+             */
+            drv_file = STREAM( globals.!repository'\PMDD_'pmdx'\'driver'.DRV', 'C', 'QUERY EXISTS')
+        END
+    END
+
+    IF drv_file == '' THEN DO
+        CALL LINEOUT globals.!log1, 'Driver' driver 'is not in the local repository.'
+        /* If the driver really isn't in the repository, there are a couple of
+         * other places that various install utilities might have put it...
+         */
+        PARSE VALUE VRGetIni('PM_INSTALL', driver'_DIR', 'USER') WITH drvr_dir '00'x .
+        IF drvr_dir == '' THEN
+            PARSE VALUE VRGetIni('InstPDR', 'PATH_TO_'driver, 'USER') WITH drvr_dir '00'x .
+        IF drvr_dir <> '' THEN DO
+            drv_file = drvr_dir'\'driver'.DRV'
+            CALL LINEOUT globals.!log1, 'Found driver in' drvr_dir'.'
+        END
+    END
+
+RETURN drv_file
+
+
+/*:VRX         GetDriverPMDD
+*/
+/* Check to see which repository directory the specified driver resides in.
+ * Returns the number suffix of the PMDD_* subdirectory name, or '' if either
+ * the driver or the index file could not be located.
+ */
+GetDriverPMDD: PROCEDURE
+    PARSE ARG driver, prdrv_lst
+
+    IF prdrv_lst <> '' THEN DO
+        CALL LINEIN prdrv_lst, 1, 0
+        DO WHILE LINES( prdrv_lst ) > 0
+            PARSE VALUE LINEIN( prdrv_lst ) WITH (driver)'.DRV' pmdx .
+            IF pmdx <> '' THEN LEAVE
+        END
+        CALL STREAM prdrv_lst, 'C', 'CLOSE'
+    END
+    ELSE pmdx = ''
+
+RETURN pmdx
+
+
+/*:VRX         LocateDriverFiles
+*/
+/* Returns:
+ *   0 - Driver files not found.
+ *   1 - Driver files found, path saved in 'driver_path'; 'driver_repo' will be 1
+ *       if the driver is 'shipped' (i.e. defined in PRDRV.LST) or 0 otherwise.
+ *   2 - Only found installed driver files in (\OS2\DLL\xxx, saved in 'driver_path');
+ *       will need to copy them somewhere for future installs.
+ */
+LocateDriverFiles: PROCEDURE EXPOSE globals. driver_path driver_repo
+    ARG driver
+    IF driver == '' THEN driver = 'PSCRIPT'
+
+    CALL LINEOUT globals.!log1, 'Looking for' driver 'files'
+
+    mustcopy = 0
+    driver_path = GetDriverSource( driver )
+
+    IF driver_path == '' THEN DO
+        /* No source found.  We'll have to try copying the actual installed
+         * driver files from under \OS2\DLL.
+         */
+        CALL LINEOUT globals.!log1, 'Driver source not found.  Trying installed driver.'
+        PARSE VALUE VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER') WITH drv_used '00'x .
+        IF ( drv_used <> '') & VRFileExists( drv_used ) THEN
+            driver_path = drv_used
+    END
+    IF driver_path <> '' THEN DO
+        srcdir = VRParseFilePath( driver_path, 'DP')
+        pin    = STREAM( srcdir'\PIN.EXE',    'C', 'QUERY EXISTS')
+        ppdenc = STREAM( srcdir'\PPDENC.EXE', 'C', 'QUERY EXISTS')
+        /* TODO should we check for all the REQUIREDDRIVER FILES as well? */
+    END
+
+    IF pmdx == '' THEN
+        driver_repo = 0
+    ELSE
+        driver_repo = 1
+
+    /* Driver (or one of its required files) was not found.
+     */
+    IF ( driver_path == '') | ( pin == '') | ( ppdenc == '') | ,
+       ( VerifyDriverEAs( driver_path ) == 0 ) THEN
+    DO
+        CALL LINEOUT globals.!log1, ' - Missing required driver files.'
+        RETURN 0
+    END
+
+    IF mustcopy THEN RETURN 2
+RETURN 1
+
+
+/*:VRX         VerifyDriverEAs
+*/
+/* Make sure the driver has its extended attributes.  If not, look for an
+ * accompanying .EA or .EA_ file, and join it to the driver.
+ */
+VerifyDriverEAs: PROCEDURE EXPOSE globals.
+    PARSE ARG driver
+    eas.0 = 0
+    CALL SysQueryEAList driver, 'eas.'
+    IF eas.0 == 0 THEN DO
+        ea_file = SUBSTR( driver, 1, LASTPOS('.', driver )) || 'EA'
+        IF STREAM( ea_file,  'C', 'QUERY EXISTS') ==  '' THEN
+            ea_file = ea_file || '_'
+        IF STREAM( ea_file,  'C', 'QUERY EXISTS') ==  '' THEN
+            RETURN 0
+
+        ADDRESS CMD '@UNLOCK' driver '2>NUL 1>NUL'
+        ADDRESS CMD '@EAUTIL' driver ea_file '/j /p 2>NUL 1>NUL'
+    END
+RETURN 1
+
+
+/*:VRX         BldLevelVersion
+*/
+/* Parse the revision (version) number from a BLDLEVEL string
+ */
+BldLevelVersion: PROCEDURE EXPOSE globals.
+    ARG module
+    revision = ''
+
+    _nq = RXQUEUE('CREATE')
+    _oq = RXQUEUE('SET', _nq )
+
+    ADDRESS CMD '@bldlevel' module '2>&1 | RXQUEUE' _nq
+    DO QUEUED()
+        PARSE PULL _blline
+        IF LEFT( _blline, 9 ) == 'Revision:' THEN DO
+            PARSE VAR _blline 'Revision:' revision .
+            LEAVE
+        END
+    END
+
+    CALL RXQUEUE 'SET', _oq
+    CALL RXQUEUE 'DELETE', _nq
+
+    IF revision == '' THEN revision = '-'
+
+RETURN revision
+
+
+/*:VRX         CopyPrinterPak
+*/
+/* Copies a printerpak driver and all its dependent files from one directory
+ * to another.
+ *
+ *   driver    - The fully-qualified filename of the printerpak .DRV
+ *   newdrvdir - The directory where the files will be copied; must exist
+ *
+ * Returns: 1 on success, 0 on failure
+ */
+CopyPrinterPak: PROCEDURE EXPOSE globals.
+    PARSE ARG driver, newdrvdir
+
+    drv_dir = VRParseFilePath( driver, 'DP')
+    IF drv_dir == '' THEN RETURN 0
+
+    IF VerifyDriverEAs( driver ) == 0 THEN RETURN 0
+
+    CALL LINEOUT globals.!log1, 'Copying driver files from' drv_dir 'to' newdrvdir'...'
+
+    /* Read the list of required driver files from the EAs, and copy them
+     * all to the target directory.
+     */
+    IF SysGetEA( driver, 'REQUIREDDRIVERFILES', 'reqfiles') == 0 THEN DO
+        PARSE VAR reqfiles 5 filelist
+        filelist = TRANSLATE( filelist, ' ', ',')
+        DO i = 1 TO WORDS( filelist )
+            copyfile = drv_dir'\' || WORD( filelist, i )
+            ok = VRCopyFile( copyfile, newdrvdir'\' || WORD( filelist, i ))
+            CALL LINEOUT globals.!log1, ' -' copyfile '(REQUIRED):' ok
+        END
+        DROP copyfile
+        DROP filelist
+    END
+    ELSE RETURN 0
+
+    /* If there are optional files defined as well, try to copy those also.
+     */
+    IF SysGetEA( driver, 'OPTIONALDRIVERFILES', 'reqfiles') == 0 THEN DO
+        PARSE VAR reqfiles 5 filelist
+        filelist = TRANSLATE( filelist, ' ', ',')
+        DO i = 1 TO WORDS( filelist )
+            copyfile = drv_dir'\' || WORD( filelist, i )
+            IF STREAM( copyfile, 'C', 'QUERY EXISTS') == '' THEN ITERATE
+            ok = VRCopyFile( copyfile, newdrvdir'\' || WORD( filelist, i ))
+            CALL LINEOUT globals.!log1, ' -' copyfile '(OPTIONAL):' ok
+        END
+        DROP copyfile
+        DROP filelist
+    END
+
+RETURN 1
+
+
+/*:VRX         PrinterExistsInDRV
+*/
+/* Determine if the specified PrinterPak driver already contains support
+ * for the specified printer model.
+ */
+PrinterExistsInDRV: PROCEDURE EXPOSE globals.
+    PARSE UPPER ARG driver_name, printer_name
+    printer_name = TRANSLATE( printer_name, '_', '.')
+
+    printer_drv = globals.!os2dir'\DLL\'driver_name'\'driver_name'.DRV'
+    /* ?? TODO: install driver_name if not found (prompt first) ?? */
+
+    IF SysGetEA( printer_drv, '.EXPAND', 'exist_ea') <> 0 THEN RETURN 0
+    PARSE VAR exist_ea 1 _eatype 3 .
+    IF C2X( _eatype ) <> 'FDFF' THEN RETURN 0
+
+    PARSE VAR exist_ea 3 _ealen 5 exist_models
+    total_len = C2D( REVERSE( _ealen ))
+
+    /* The variable exist_models now contains a null-separated list of printer
+     * models supported by the driver (including those from previously-imported
+     * PPD files).  Next we check each one against our requested printer name.
+     */
+    start = 1
+    found = 0
+    DO WHILE ( found == 0 ) & ( start < total_len )
+        _strend = POS('0'x, exist_models, start )
+        IF _strend == 0 THEN LEAVE
+        _model = TRANSLATE( SUBSTR( exist_models, start, _strend - start ))
+        IF _model == printer_name THEN
+            found = 1
+        ELSE
+            start = _strend + 1
+    END
+
+RETURN found
+
+
+/*:VRX         CreateDriverList
+*/
+/* Generate a driver listfile from the .EXPAND EA
+ */
+CreateDriverList: PROCEDURE EXPOSE globals.
+    ARG driver, listfile
+
+    IF STREAM( listfile, 'C', 'QUERY EXISTS') <> '' THEN
+        CALL SysFileDelete listfile
+
+    drv_name = FILESPEC('NAME', driver )
+    IF SysGetEA( driver, '.EXPAND', 'eaval') == 0 THEN DO
+        PARSE VAR eaval 3 ealen 5 models
+        offs = 1
+        datalen = C2D( REVERSE( ealen ))
+        DO WHILE offs <= datalen
+            start = SUBSTR( models, offs )
+            inc = POS('00'x, start )
+            IF inc > 1 THEN DO
+                current_name = STRIP( SUBSTR( start, 1, inc-1 ))
+                CALL LINEOUT listfile, current_name':' current_name '('drv_name')'
+            END
+            offs = offs + inc
+        END
+        CALL LINEOUT listfile
+        CALL LINEOUT globals.!log1, 'Created driver list' listfile 'for' driver'.'
+    END
+    ELSE
+        CALL LINEOUT globals.!log1, 'No drivers found in' driver '(missing .EXPAND extended attribute?)'
+
+RETURN 1
+
+
+/*:VRX         AddPort_CUPS
+*/
+/* Adds a new CUPS port.  Returns 0 on full success, 1 if the port was created
+ * but could not be configured, and an OS/2 or PM error code otherwise.
+ */
+AddPort_CUPS: PROCEDURE EXPOSE globals.
+    PARSE ARG portname, hostname, queuename
+    CALL LINEOUT globals.!log1, 'Creating new port' portname
+    ADDRESS CMD '@cupsport' portname hostname queuename '>>' globals.!log2
+    IF rc == 1 THEN DO
+        CALL VRSetIni 'PM_'portname, 'INITIALIZATION', hostname'#'queuename||'00'x, 'SYSTEM', 'NoClose'
+        CALL VRSetIni 'PM_'portname, 'DESCRIPTION',    hostname':'queuename||'00'x, 'SYSTEM'
+    END
+RETURN rc
+
+
+/*:VRX         DeletePort
+*/
+/* Deletes a printer port (any type).
+ */
+DeletePort: PROCEDURE EXPOSE globals.
+    PARSE ARG portname
+    CALL SysIni 'SYSTEM', 'PM_'portname, 'DELETE:'
+    CALL SysIni 'SYSTEM', 'PM_SPOOLER_PORT', portname, 'DELETE:'
+RETURN 1
+
+
+/*:VRX         GetNextPortName
+*/
+/* Get the next unique (non-existing) port name for the specified port driver.
+ */
+GetNextPortName: PROCEDURE
+    ARG portdrv
+
+    maxports = 64       /* should be smarter about this if possible */
+    exists = 1
+    x = 0
+    DO WHILE ( x < maxports ) & ( exists == 1 )
+        x = x + 1
+        portname = portdrv || x
+        nextport = SysIni('SYSTEM', 'PM_SPOOLER_PORT', portname )
+        IF LEFT( nextport, 6 ) == 'ERROR:' THEN exists = 0
+    END
+    IF exists == 1 THEN
+        portname = ''
+
+RETURN portname
+
+
+/*:VRX         GetPortDrivers
+*/
+/* Get the list of currently-installed port drivers.  NOTE: we exclude LPRPDRVR
+ * from this list, because it has to be managed via the TCP/IP configuration
+ * program.
+ */
+GetPortDrivers: PROCEDURE EXPOSE portdrivers.
+    ok = SysIni('SYSTEM', 'PM_PORT_DRIVER', 'ALL:', 'installed.')
+    IF LEFT( ok, 6 ) == 'ERROR:' THEN RETURN 0
+    count = 0
+    DO i = 1 TO installed.0
+        IF installed.i = 'LPRPDRVR' THEN ITERATE
+        fullpath = STRIP( SysIni('SYSTEM', 'PM_PORT_DRIVER', installed.i ), 'T', '00'x )
+        IF LEFT( fullpath, 6 ) == 'ERROR:' THEN fullpath = ''
+        fullpath = STREAM( fullpath , 'C', 'QUERY EXISTS')
+        count = count + 1
+        portdrivers.count = installed.i || ' ' || fullpath
+    END
+    portdrivers.0 = count
+RETURN portdrivers.0
+
+
+/*:VRX         GetQueueName
+*/
+/* Generate a unique queue name from the specified printer name.
+ */
+GetQueueName: PROCEDURE
+    ARG queuename
+
+    DO UNTIL badchar = 0
+        badchar = VERIFY( queuename, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ-_0123456789 ')
+        IF badchar > 0 THEN
+            queuename = OVERLAY(' ', queuename, badchar, 1 )
+    END
+    queuename = LEFT( SPACE( queuename, 0 ), 8 )
+
+    tail = 0
+    PARSE VALUE VRGetIni('PM_SPOOLER', 'DIR', 'SYSTEM') WITH spldir ';' .
+    DO WHILE VRFileExists( spldir'\'queuename ) == 1
+        tail = tail + 1
+        queuename = STRIP( LEFT( queuename, 8 - LENGTH( tail ))) || tail
+    END
+
+RETURN queuename
+
+
+/*:VRX         InstallPortDriver
+*/
+/* Installs a new port driver.
+ *
+ * Returns: 0 on success, 1 on error
+ */
+InstallPortDriver: PROCEDURE EXPOSE globals.
+    ARG new_pdr
+    filename = VRParseFileName( new_pdr, 'NE')
+    IF filename == '' THEN RETURN
+    installed_pdr = TRANSLATE( globals.!os2dir'\DLL\'filename )
+    IF installed_pdr <> new_pdr THEN DO
+        ok = VRCopyFile( new_pdr, installed_pdr )
+        IF ok == 0 THEN RETURN 1
+        /* Try to copy any optional files as well */
+        IF SysGetEA( new_pdr, 'OPTIONALDRIVERFILES', 'reqfiles') == 0 THEN DO
+            drv_dir = VRParseFilePath( new_pdr, 'DP')
+            PARSE VAR reqfiles 5 filelist
+            filelist = TRANSLATE( filelist, ' ', ',')
+            DO i = 1 TO WORDS( filelist )
+                copyfile = drv_dir'\' || WORD( filelist, i )
+                IF STREAM( copyfile, 'C', 'QUERY EXISTS') == '' THEN ITERATE
+                ok = VRCopyFile( copyfile, newdrvdir'\' || WORD( filelist, i ))
+                /*CALL LINEOUT globals.!log1, ' -' copyfile '(OPTIONAL):' ok*/
+            END
+        END
+    END
+
+    key = VRParseFileName( installed_pdr, 'N')
+    CALL VRSetIni 'PM_PORT_DRIVER', key, installed_pdr||'00'x, 'SYSTEM'
+RETURN 0
+
+
+/*:VRX         InstallPrintDriver
+*/
+/* 'Installs' (that is to say, registers with the spooler) an OS printer
+ * device driver/model.  Installs the corresponding printerpak driver if
+ * necessary.
+ *
+ *   driver     - The name of the printerpak driver (without path or extension)
+ *   driverfull - The fully-qualified filename of the printerpak driver
+ *   model      - The printer make/model name used by the driver
+ *
+ * Returns: 0 on success, 1 on error
+ */
+InstallPrintDriver: PROCEDURE EXPOSE globals.
+    PARSE ARG driver, driverfull, model
+
+    ok = 0
+    targetdir = globals.!os2dir'\DLL\'driver
+    targetdrv = targetdir'\'driver'.DRV'
+    IF ( VRFileExists( targetdrv ) == 0 ) THEN DO
+        CALL VRMkDir targetdir
+        r = CopyDriverToSource( driverfull, targetdir )
+        IF r <> 1 THEN ok = 1
+    END
+    IF ok == 0 THEN DO
+        IF VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER') <> targetdrv THEN
+            CALL VRSetIni 'PM_DEVICE_DRIVERS', driver, targetdrv||'00'x, 'USER'
+        CALL VRSetIni 'PM_SPOOLER_DD', driver'.'model, driver'.DRV;;;'||'00'x, 'SYSTEM'
+    END
+RETURN ok
+
+/*:VRX         CreatePrinterObject
+*/
+/* Create the specified printer using SysCreateObject (this should create the
+ * queue automatically).
+ *
+ * Returns: 0 on success or non-zero return code on error.
+ */
+CreatePrinterObject: PROCEDURE EXPOSE globals.
+    PARSE ARG driver, model, portname, queuename, printername
+
+    CALL LINEOUT globals.!log1, 'Creating new printer:' printername '('queuename')'
+    ok = RPUPrinterCreate( printername, queuename, portname, driver'.'model )
+RETURN ok
+
+/*:VRX         GetNameFromPPD
+*/
+GetNameFromPPD: PROCEDURE
+    ARG ppd_file
+
+    IF STREAM( ppd_file, 'C', 'QUERY EXISTS') == '' THEN RETURN ''
+    nickname = ''
+    IF VRParseFilePath( ppd_file, 'E') == 'GZ' THEN DO
+        nq = RXQUEUE('CREATE')
+        oq = RXQUEUE('SET', nq )
+        ADDRESS CMD '@gzip -c -d' ppd_file '| RXQUEUE' nq
+        DO QUEUED()
+            PARSE PULL line
+            line = STRIP( line )
+            IF LEFT( line, 15 ) == '*ShortNickName:' THEN DO
+            PARSE VAR line . ':' _nick '0D'x .
+                nickname = STRIP( _nick )
+                nickname = STRIP( nickname, 'B', '"')
+                LEAVE
+            END
+        END
+        CALL RXQUEUE 'SET',    oq
+        CALL RXQUEUE 'DELETE', nq
+    END
+    ELSE DO
+        CALL LINEIN ppd_file, 1, 0
+        DO WHILE LINES( ppd_file ) <> 0
+            line = STRIP( LINEIN( ppd_file ))
+            IF LEFT( line, 15 ) == '*ShortNickName:' THEN DO
+            PARSE VAR line . ':' _nick '0D'x .
+                nickname = STRIP( _nick )
+                nickname = STRIP( nickname, 'B', '"')
+                LEAVE
+            END
+        END
+        CALL STREAM ppd_file,  'C', 'CLOSE'
+    END
+
+RETURN nickname
+
+/*:VRX         CleanPPD
+*/
+/* Clean out lines from Gutenprint and Foomatic PPD files that are known to
+ * cause problems when importing with PIN.  (Partially based on work by Paul
+ * Smedley and Peter Brown).
+ */
+CleanPPD: PROCEDURE
+    PARSE ARG in_ppd, logfile
+    IF logfile <> '' THEN
+        logfile = STREAM( logfile, 'C', 'QUERY EXISTS')
+
+    out_ppd = VRParseFilePath( in_ppd, 'DPN') || '.TMP'
+    IF STREAM( out_ppd, 'C', 'QUERY EXISTS') \= '' THEN
+        CALL SysFileDelete out_ppd
+
+    IF logfile <> '' THEN
+        CALL CHAROUT logfile, 'Doing cleanup on' in_ppd '...'
+
+    skip_next = 0
+    DO WHILE LINES( in_ppd ) \= 0
+        line = LINEIN( in_ppd )
+        SELECT
+            WHEN skip_next == 1 THEN DO
+                line = STRIP( TRANSLATE( line ))
+                IF line == '*END' THEN skip_next = 0
+            END
+            WHEN LEFT( line, 11 ) == '*StpDefault'        THEN NOP
+            WHEN LEFT( line, 7  ) == '*StpStp'            THEN NOP
+            WHEN LEFT( line, 18 ) == '*StpResolutionMap:' THEN NOP
+            WHEN LEFT( line, 14 ) == '*OPOptionHints'     THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*da.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*de.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*es.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*fi.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*fr.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*it.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*ja.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*ko.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*nb.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*nl.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*pt.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*sv.'               THEN NOP
+            WHEN LEFT( line, 7 ) ==  '*zh_CN.'            THEN NOP
+            WHEN LEFT( line, 7 ) ==  '*zh_TW.'            THEN NOP
+            WHEN LEFT( line, 9  ) == '*Foomatic'          THEN DO
+                line = STRIP( line )
+                IF RIGHT( line, 2 ) == '&&' THEN skip_next = 1
+            END
+            OTHERWISE DO
+                CALL LINEOUT out_ppd, line
+                skip_next = 0
+            END
+        END
+    END
+    CALL STREAM in_ppd,  'C', 'CLOSE'
+    CALL STREAM out_ppd, 'C', 'CLOSE'
+
+    ok = VRCopyFile( out_ppd, in_ppd )
+    IF logfile <> '' THEN DO
+        IF ok == 1 THEN
+            CALL LINEOUT logfile, 'OK'
+        ELSE DO
+            CALL LINEOUT logfile, 'Failed!'
+            CALL LINEOUT logfile, '  ->' VRError()
+        END
+        CALL LINEOUT logfile, ''
+    END
+    CALL SysFileDelete out_ppd
+
+RETURN
+
+/*:VRX         MatchPrinterModel
+*/
+/* Find a set of printers supported by the OS/2 driver which mostly closely
+ * match the given name.
+ */
+MatchPrinterModel: PROCEDURE EXPOSE globals. models.
+    PARSE UPPER ARG driver_name, printer_name
+    printer_name = TRANSLATE( printer_name, '_', '.')
+    printer_drv = globals.!os2dir'\DLL\'driver_name'\'driver_name'.DRV'
+    models.0 = 0
+
+    IF SysGetEA( printer_drv, '.EXPAND', 'exist_ea') <> 0 THEN RETURN 0
+    PARSE VAR exist_ea 1 _eatype 3 .
+    IF C2X( _eatype ) <> 'FDFF' THEN RETURN 0
+
+    PARSE VAR exist_ea 3 _ealen 5 exist_models
+    total_len = C2D( REVERSE( _ealen ))
+
+    /* The variable exist_models now contains a null-separated list of printer
+     * models supported by the driver (including those from previously-imported
+     * PPD files).  Next we check each one against our requested printer name.
+     */
+    start = 1
+    count = 0
+    best  = 0
+    DO WHILE start < total_len
+        _strend = POS('0'x, exist_models, start )
+        IF _strend == 0 THEN LEAVE
+        _model = TRANSLATE( SUBSTR( exist_models, start, _strend - start ))
+        _model = TRANSLATE( _model, ' ', '-')
+        _comp = COMPARE( _model, printer_name )
+        IF WORD( _model, 1 ) == WORD( printer_name, 1 ) THEN DO
+            count = count + 1
+            IF _comp == 0 THEN DO
+                _comp = 9999
+                best  = count
+            END
+            ELSE IF ( best == 0 ) & ( _comp > LENGTH( printer_name )) THEN
+                best = count
+/*
+            models.count = RIGHT( _comp, 4, '0') SUBSTR( exist_models, start, _strend - start )
+*/
+            models.count = SUBSTR( exist_models, start, _strend - start )
+        END
+        start = _strend + 1
+    END
+    models.0 = count
+
+/*
+    CALL SysStemSort 'models.', 'D', 'I',,, 1, 4
+    DO i = 1 TO count
+        models.i = SUBWORD( models.i, 2 )
+    END
+*/
+RETURN best
+
+
+/*:VRX         CheckWritablePath
+*/
+CheckWritablePath: PROCEDURE EXPOSE globals.
+    ARG path
+
+    /* Make sure path exists & is a directory */
+    IF \VRIsDir( path ) THEN RETURN 1
+
+    /* Make sure the drive is accessible */
+    di = SysDriveInfo( VRParseFilePath( path, 'DP'))
+    IF di == '' THEN RETURN 2
+
+    /* Make sure the drive has a supported filesystem */
+    fs = SysFileSystemType( prdrv )
+    IF WORDPOS( fs, 'HPFS JFS FAT FAT32') == 0 THEN RETURN 3
+
+RETURN 0
+
+
+/*:VRX         QueryAvailableDrivers
+*/
+/* Determine which of our supported PrinterPak drivers are currently available.
+ */
+QueryAvailableDrivers: PROCEDURE EXPOSE globals. drv_list.
+    drv_list.0 = 0
+
+    test_drivers = 'ECUPS ECUPS-HP PSPRINT'
+    DO i = 1 TO WORDS( test_drivers )
+        driver = WORD( test_drivers, i )
+        ok = GetDriverSource( driver )
+        IF ok == '' THEN
+            ok = VRGetIni('PM_DEVICE_DRIVERS', driver, 'USER')
+        IF ok <> '' THEN
+            CALL SysStemInsert 'drv_list.', drv_list.0+1, driver
+    END
+
+RETURN drv_list.0
+
+
+/*:VRX         UpdatePrDesc
+*/
+UpdatePrDesc: PROCEDURE EXPOSE globals.
+    ARG driver, fqn
+
+    IF globals.!prdesc == '' THEN RETURN 1
+
+    ok = RPUEnumModels( fqn, 'newdevs.')
+    IF ok == 0 THEN RETURN 2
+
+    _count = 0
+    CALL LINEIN globals.!prdesc, 1, 0
+    DO WHILE LINES( globals.!prdesc )
+        _next = LINEIN( globals.!prdesc )
+        PARSE UPPER VAR _next WITH . ':' . '('_prdrv')' .
+        IF _prdrv == driver THEN ITERATE
+        _count = _count + 1
+        prdefs.count = _next
+    END
+    CALL STREAM globals.!prdesc, 'C', 'CLOSE'
+
+    DO i = 1 TO devs.0
+        _count = _count + 1
+        prdefs._count = newdevs.i':' newdevs.i '('driver')'
+    END
+    prdefs.0 = count
+
+    CALL VRSortStem 'prdefs.'
+
+    _prdir = VRParseFileName( globals.!prdesc, 'DP')
+    CALL VRCopyFile globals.!prdesc, _prdir'\PRDESC.BAK'
+    CALL VRDeleteFile globals.!prdesc
+    DO i = 1 TO prdefs.0
+        CALL LINEOUT globals.!prdesc, prdefs.i
+    END
+    CALL LINEOUT globals.!prdesc
+
+RETURN 0
+
+
+/*:VRX         NLSGetMessage
+*/
+/*
+ * Gets the message text associated with the given message number from the
+ * current language file.
+ */
+NLSGetMessage: PROCEDURE EXPOSE globals.
+    PARSE ARG msgnum, .
+    args = ARG()
+
+    msgfile = globals.!messages
+    IF msgnum == '' THEN RETURN ''
+
+    sub_parms = ''
+    DO i = 2 TO args
+        sub_parms = sub_parms', "'ARG( i )'"'
+    END
+
+    INTERPRET 'msgfromfile = SysGetMessage( msgnum, msgfile' sub_parms ')'
+
+    PARSE VAR msgfromfile message '0D'x .
+    IF SUBSTR( message, 1, 4 ) == 'SYS0' THEN message = ''
+
+RETURN message
+
+
+/*:VRX         NLSSetText
+*/
+/*
+ * Sets the specified property of the specified control to the specified
+ * message text.
+ */
+NLSSetText: PROCEDURE EXPOSE globals.
+    PARSE ARG control, property, message, substitution
+    args = ARG()
+
+    success = 1
+    IF args < 4 THEN
+        text = NLSGetMessage( message )
+    ELSE DO
+        sub_parms = ''
+        DO i = 4 TO args
+            sub_parms = sub_parms '"'|| ARG( i ) ||'",'
+        END
+        sub_parms = STRIP( sub_parms, 'T', ',')
+        INTERPRET 'text = NLSGetMessage( message, 'sub_parms')'
+    END
+
+    IF text == '' THEN success = 0
+    ELSE               CALL VRSet control, property, text
+
+RETURN success
+
