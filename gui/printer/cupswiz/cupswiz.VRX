@@ -1089,16 +1089,29 @@ Init:
     CALL SetLanguage
     CALL CheckPrograms
 
-    IF InitArgs.0 > 0 THEN globals.!cupsdir = InitArgs.1
-
-    IF \VRIsDir( globals.!cupsdir ) THEN DO
-        IF TRANSLATE( globals.!cupsdir ) <> '/R' THEN
-            CALL VRMessage VRWindow(),
-                           NLSGetMessage( 65, 'CUPSWIZ F:\CUPS') ||,    /* 65: CUPS could not be located ... on the command line to this program (e.g "%1"). */
-                           '0d0a0d0a'x || NLSGetMessage( 66 ),,         /* 66: Only remote CUPS queues ... start this program with the /R parameter.) */
-                           NLSGetMessage( 28 ), 'E'                     /* 28: CUPS Path Not Found or Not Valid */
-        globals.!cupsdir = ''
+    _force_remote = 0
+    globals.!prt_ppd = ''
+    IF InitArgs.0 > 0 THEN 
+    DO i = 1 TO InitArgs.0
+        InitArgs.i = TRANSLATE( InitArgs.i )
+        IF VRIsDir( InitArgs.i ) THEN
+            globals.!cupsdir = InitArgs.1
+        ELSE IF InitArgs.i == '/R' THEN DO
+                globals.!cupsdir = ''
+                _force_remote = 1
+        END
+        ELSE IF VRFileExists( InitArgs.i ) THEN DO
+            _filetype = VRParseFileName( InitArgs.i, 'E')
+            IF _filetype == 'PPD' THEN
+                globals.!prt_ppd = InitArgs.i
+        END
     END
+
+    IF globals.!cupsdir == '' & \_force_remote THEN
+        CALL VRMessage VRWindow(),,
+                       NLSGetMessage( 65, 'CUPSWIZ F:\CUPS') ||,    /* 65: CUPS could not be located ... on the command line to this program (e.g "%1"). */
+                       '0d0a0d0a'x || NLSGetMessage( 66 ),,         /* 66: Only remote CUPS queues ... start this program with the /R parameter.) */
+                       NLSGetMessage( 28 ), 'E'                     /* 28: CUPS Path Not Found or Not Valid */
 
     /* Delete the error log file each time the program starts.
      */
@@ -1539,6 +1552,8 @@ PB_NEXT_Click: PROCEDURE EXPOSE globals. manufacturers.
             CALL VRSet 'EF_NAME',     'Value', ''
             CALL VRSet 'EF_LOCATION', 'Value', ''
             CALL VRSet 'EF_DESC',     'Value', ''
+
+            globals.!prt_ppd = ''
             CALL SetPage1
         END
 
@@ -1642,6 +1657,38 @@ RETURN 1
 SetPage1: PROCEDURE EXPOSE globals. manufacturers.
 
     CALL VRMethod 'LB_BRAND', 'Clear'
+
+    globals.!page       = 1
+    globals.!prt_port   = ''
+    globals.!remotecups = ''
+    globals.!prt_name   = ''
+    globals.!prt_loc    = ''
+    globals.!prt_info   = ''
+    globals.!os2driver  = ''
+
+    /* If a PPD was passed on the command line, skip to page 2 */
+    IF globals.!prt_ppd <> '' THEN DO
+        globals.!prt_dev  = ''
+        globals.!prt_nick = GetNameFromPPD( globals.!prt_ppd )
+        IF globals.!prt_nick == '' THEN DO
+            CALL VRMessage VRWindow(), NLSGetMessage( 76, globals.!prt_ppd  ),,     /* 76: Could not read printer name from %1. */
+                                       NLSGetMessage( 77 ), 'E'                     /* 77: Invalid PPD */
+        END
+        ELSE DO
+            globals.!mode = 2   /* Mode 2: user-selected PPD file */
+            globals.!remotecups = ''
+            CALL InitMessageLog
+            CALL LINEOUT globals.!log1, 'Starting printer install with user-provided PPD:'
+            CALL LINEOUT globals.!log1, ''
+            CALL SetPage2
+            RETURN
+        END
+    END
+
+    globals.!prt_ppd    = ''
+    globals.!prt_dev    = ''
+    globals.!prt_nick   = ''
+
     CALL VRSet 'PB_NEXT',  'Enabled', 0
     CALL VRSet 'LB_BRAND', 'Visible', 1
 
@@ -1653,17 +1700,6 @@ SetPage1: PROCEDURE EXPOSE globals. manufacturers.
 
     CALL VRSet 'LB_SELECT', 'Visible', 1
     CALL VRSet 'GB_INFO',   'Visible', 0
-
-    globals.!page       = 1
-    globals.!prt_ppd    = ''
-    globals.!prt_dev    = ''
-    globals.!prt_nick   = ''
-    globals.!prt_port   = ''
-    globals.!remotecups = ''
-    globals.!prt_name   = ''
-    globals.!prt_loc    = ''
-    globals.!prt_info   = ''
-    globals.!os2driver  = ''
 
     CALL VRSet 'WN_MAIN', 'Pointer', 'WAIT'
 
@@ -1798,7 +1834,7 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.02'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.04'                                  /* 12: Version %1 */
     CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
