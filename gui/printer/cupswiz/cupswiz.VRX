@@ -16,13 +16,14 @@ Main:
             argCount = argCount - 1
             argOff = 1
         end
+        InitArgs.0 = argCount
+        if( argCount > 0 )then do i = 1 to argCount
+            InitArgs.i = arg( i + argOff )
+        end
     end; else do
         call VROptions 'ImplicitNames'
         call VROptions 'NoEchoQuit'
-    end
-    InitArgs.0 = argCount
-    if( argCount > 0 )then do i = 1 to argCount
-        InitArgs.i = arg( i + argOff )
+        argCount = _ParseParams( arg(1) )
     end
     drop calledAs argCount argOff
 
@@ -100,6 +101,34 @@ __VXREXX____APPENDS__:
 #append ..\..\Shared\PrintUtl.VRS
 */
 return
+/*:VRX         _ParseParams
+*/
+_ParseParams: PROCEDURE EXPOSE InitArgs.
+  /* Parse program parameters when they are provided as a single string,
+   * including handling quotes.
+   */
+
+  parse arg thisArgs
+
+  InitArgs. = ''
+  InitArgs.0 = 0
+
+  do while thisargs <> ''
+
+    parse value strip( thisArgs, "B" ) with curArg thisArgs
+
+    parse var curArg tc1 +1 .
+    if tc1 = '"' | tc1 = "'" then
+      parse value curArg thisArgs with (tc1) curArg (tc1) ThisArgs
+
+   i = InitArgs.0 + 1
+   InitArgs.i = strip( curArg )
+   InitArgs.0 = i
+
+  end /* do while thisArgs <> '' */
+
+RETURN InitArgs.0
+
 /*:VRX         CheckPrograms
 */
 CheckPrograms: PROCEDURE EXPOSE globals.
@@ -1097,8 +1126,9 @@ Init:
         IF VRIsDir( InitArgs.i ) THEN
             globals.!cupsdir = InitArgs.1
         ELSE IF InitArgs.i == '/R' THEN DO
-                globals.!cupsdir = ''
-                _force_remote = 1
+say 'remote'
+            globals.!cupsdir = ''
+            _force_remote = 1
         END
         ELSE IF VRFileExists( InitArgs.i ) THEN DO
             _filetype = VRParseFileName( InitArgs.i, 'E')
