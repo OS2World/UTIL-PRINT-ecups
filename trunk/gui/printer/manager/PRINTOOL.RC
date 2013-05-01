@@ -1,0 +1,11 @@
+ICON 1  PRELOAD program.ico
+ICON 2  PRELOAD tango_printer.ico
+/*
+ICON 3  PRELOAD tango_printer_remote.ico
+ICON 4  PRELOAD file.ico
+ICON 5  PRELOAD port_generic.ico
+ICON 6  PRELOAD port_network.ico
+ICON 7  PRELOAD port_usb.ico
+ICON 10  PRELOAD port_cups.ico
+*/
+ICON 20  PRELOAD create.ico

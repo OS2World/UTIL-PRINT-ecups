@@ -1,0 +1,254 @@
+; Message file for Printer Manager
+; English version
+PTM
+; ------- [1-19]: Common strings used throughout the program
+PTM0001I: Manage Printers
+PTM0002I: OK
+PTM0003I: Cancel
+PTM0004I: Help
+PTM0005I: ~New
+PTM0006I: ~Delete
+PTM0007I: ~Open
+PTM0008I: ~Install
+PTM0009I: ~Remove
+PTM0010I: ~Properties
+PTM0011I: Next ~>
+PTM0012I: ~Close
+PTM0013I: Error
+PTM0014I: Yes
+PTM0015I: No
+PTM0016I: Operation Successful
+PTM0017I: Continue
+PTM0018?:
+PTM0019?:
+; ------- [20-99]: Menus
+; - (Some of these are duplicated so that they can use different shortcut keys)
+PTM0020I: ~File
+PTM0021I: ~Manage presentation drivers...
+PTM0022I: ~Import PPD...
+PTM0023?:
+PTM0024?:
+PTM0025?:
+PTM0026?:
+PTM0027?:
+PTM0028?:
+PTM0029I: E~xit
+PTM0030I: ~Printer
+PTM0031I: ~Open
+PTM0032I: ~Properties...
+PTM0033I: Pause ~queue
+PTM0034I: ~Default printer
+PTM0035I: ~Create new
+PTM0036I: Dele~te
+PTM0037?:
+PTM0038?:
+PTM0039?:
+PTM0040I: P~ort
+PTM0041I: ~Add new
+PTM0042I: ~Delete
+PTM0043I: ~Properties...
+PTM0044?:
+PTM0045?:
+PTM0046?:
+PTM0047?:
+PTM0048?:
+PTM0049?:
+PTM0050I: ~Driver
+PTM0051I: ~Install
+PTM0052I: ~Remove
+PTM0053?:
+PTM0054?:
+PTM0055?:
+PTM0056?:
+PTM0057?:
+PTM0058?:
+PTM0059?:
+PTM0060I: ~View
+PTM0061I: ~Details
+PTM0062I: ~Icon
+PTM0063I: ~Refresh
+PTM0064?:
+PTM0065?:
+PTM0066?:
+PTM0067?:
+PTM0068?:
+PTM0069?:
+PTM0070I: P~rinterPak
+PTM0071I: ~Supported devices...
+PTM0072I: ~Copy path
+PTM0073?:
+PTM0074?:
+PTM0075?:
+PTM0076?:
+PTM0077?:
+PTM0078?:
+PTM0079?:
+PTM0080I: ~Help
+PTM0081I: General help
+PTM0082?:
+PTM0083?:
+PTM0084?:
+PTM0085?:
+PTM0086?:
+PTM0087?:
+PTM0088?:
+PTM0089I: ~Product information
+PTM0090?:
+PTM0091?:
+PTM0092?:
+PTM0093?:
+PTM0094?:
+PTM0095?:
+PTM0096?:
+PTM0097?:
+PTM0098?:
+PTM0099?:
+; ------- [100-109]: Text on the main notebook pages
+PTM0100I: Printers
+PTM0101I: Drivers
+PTM0102I: Ports
+PTM0103I: Installed Printers
+PTM0104I: Installed Printer Drivers
+PTM0105I: Installed Ports
+PTM0106I: (Passthrough Driver)
+PTM0107?:
+PTM0108?:
+PTM0109?:
+; Container column titles
+PTM0110I: Title
+PTM0111I: Name
+PTM0112I: Real Name
+PTM0113I: PM Queue Name
+PTM0114I: CUPS Queue Name
+PTM0115I: Remote Host
+PTM0116I: Driver
+PTM0117I: Port
+PTM0118I: Flags
+PTM0119I: Port Driver
+PTM0120?:
+PTM0121?:
+PTM0122?:
+PTM0123?:
+PTM0124?:
+PTM0125?:
+PTM0126?:
+PTM0127?:
+PTM0128?:
+PTM0129?:
+; ------- Text on the Product Information dialog
+PTM0130I: Product Information
+PTM0131I: %1 Printer Manager
+PTM0132I: Version %1
+PTM0133I: (C) %1 Alexander Taylor. All rights reserved.
+PTM0134I: Using %1 with:
+; 135 is a bullet character - use something language- and codepage-appropriate
+PTM0135I: 
+PTM0136I: (by %1)
+PTM0137I: Includes graphics based on the Tango icon set by Rodney Dawes et al, licensed under the Creative Commons Attribution-ShareAlike License: http://creativecommons.org/licenses/by-sa/2.5/
+PTM0138I: This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
+PTM0139?:
+; ------- Printer creation wizard
+PTM0140I: Install Printer
+PTM0141I: Select the type of printer you wish to install.
+PTM0142I: Select the action you wish to perform.
+PTM0143I: Install a local or network printer (CUPS-based)
+PTM0144I: Install a printer using legacy drivers:
+PTM0145I: Standard printer
+PTM0146I: IBM Peer or LAN Server printer
+PTM0147I: Advanced printer management
+PTM0148?:
+PTM0149?:
+PTM0150?:
+PTM0151?:
+PTM0152?:
+PTM0153?:
+PTM0154?:
+PTM0155?:
+PTM0156?:
+PTM0157?:
+PTM0158?:
+PTM0159?:
+; ------- Port creation dialog
+PTM0160I: Add New Port
+PTM0161I: Select the type of port to add.
+PTM0162I: Installed Port Drivers
+PTM0163I: To install a type of port which is not shown here, choose "Other" and then select the appropriate port driver file.
+PTM0164I: Other...
+PTM0165I: Select Port Driver
+PTM0166I: Failed to install port driver.
+PTM0167I: Failed to create port:
+PTM0168?:
+PTM0169?:
+; ------- PrinterPak management dialog
+PTM0170I: Manage Presentation Drivers
+PTM0171I: The following printer presentation drivers (PrinterPaks) are available:
+PTM0172I: Local repository path:  %1
+PTM0173I: Name
+PTM0174I: Comment
+PTM0175I: Installable From
+PTM0176I: Status
+PTM0177I: Included with %1
+PTM0178I: Third-party driver
+PTM0179I: ~Add/Update...
+PTM0180I: (installed)
+PTM0181I: Version
+PTM0182I: Select PrinterPak Driver
+PTM0183I: The source and target directories are the same.
+PTM0184I: Local Repository Not Accessible
+PTM0185I: The system-defined driver path (%1) is either unavailable or non-writable.  (The system may be configured to install shipped drivers from CD.)
+PTM0186I: If you want to make this updated driver available for future printer installations, %1 needs to be treated as a third-party driver.  This means that it will be copied to a new local directory, and you will need to manually select it (using the 'other' option) when installing a new printer model.  If this is acceptable, select 'OK' to continue.
+PTM0187I: Please confirm the directory where %1 and its associated files will be copied.
+PTM0188I: ~Browse...
+PTM0189I: Select Directory
+PTM0190I: Do you want to update the copy of this driver which is currently in-use by existing printers?  (This may require a system reboot to take effect.)
+PTM0191I: Update Existing Printers
+PTM0192I: The driver has been updated.  You may need to shut down and reboot for the change to take effect.
+PTM0193I: The driver was added successfully.
+PTM0194I: Supported Models
+PTM0195I: Supported devices in %1 (%2 total):
+PTM0196?:
+PTM0197?:
+PTM0198?:
+PTM0199?:
+; User messages
+PTM0200I: Please Confirm
+PTM0201I: Delete printer "%1"?
+PTM0202I: Delete port %1?
+PTM0203I: Delete driver "%1"?
+PTM0204?:
+PTM0205I: Add a new port of type %1?
+PTM0206?:
+PTM0207?:
+PTM0208?:
+PTM0209?:
+PTM0210I: No Properties
+PTM0211I: There are no properties available for the port %1.
+PTM0212?:
+PTM0213?:
+PTM0214?:
+PTM0215?:
+PTM0216?:
+PTM0217?:
+PTM0218?:
+PTM0219?:
+PTM0220I: An error occurred while copying files.
+PTM0221I: An error occurred when attempting to create a directory.
+PTM0222I: An invalid path was specified.
+PTM0223I: An error occurred while importing the PPD file.
+PTM0224I: An error occurred while trying to update %1.
+PTM0225?:
+PTM0226?:
+PTM0227?:
+PTM0228?:
+PTM0229?:
+PTM0230I: Select PPD File
+PTM0231I: The %1 driver or one of its required files could not be located.
+PTM0232I: The install files for the %1 driver could not be located.  These files will be recreated from the driver files which are already installed on your system.
+PTM0233I: Please indicate how this PPD will be used.
+PTM0234I: Install or update a CUPS-based printer.
+PTM0235I: Add support to a legacy PostScript driver.
+PTM0236I: Import PostScript Printer Description
+PTM0237I: You cannot import a PPD file unless you have either CUPS or at least one legacy PostScript driver installed.
+PTM0238I: The PPD has been imported.
+PTM0239?:
+
