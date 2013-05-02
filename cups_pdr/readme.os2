@@ -9,6 +9,8 @@ Current limitations:
 2) ????
 
 History:
+2013-05-01      - fixed partially broken SplPdQuery
+                - fixed bldlevel description
 2011-02-16      - implemented SplPdSet and SplPdQuery APIs
                 - cupslpr.exe is now loaded from the path where TCP/IP is installed (even if not on the boot drive)
                 - removed useless binary-mode checkbox from properties dialog (it did nothing anyway)

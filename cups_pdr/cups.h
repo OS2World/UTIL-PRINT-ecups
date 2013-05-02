@@ -1,4 +1,4 @@
-#define DRIVER_VERSION                "1.03"
+#define DRIVER_VERSION                "1.04"
 #define PATH_CUPS_PDR                 "?:\\OS2\\DLL\\CUPS.PDR"
 #define CUPS_DLL                      "CUPS.PDR"
 

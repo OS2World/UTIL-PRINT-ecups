@@ -895,8 +895,13 @@ ULONG  APIENTRY SplPdQuery ( PSZ    pszPortName,
     switch ( ulCommand ) {
 
         case BIDI_Q_PORTDRV:
+            // If no buffer was provided, just return the required size
+            if ( !pOutData && pcbOutData ) {
+                *pcbOutData = sizeof( PORTSETTINGS );
+                return ERROR_MORE_DATA;
+            }
             // Make sure the data is valid
-            if ( !pOutData || *pcbOutData < sizeof( PORTSETTINGS ))
+            if ( !pOutData || !pcbOutData || ( *pcbOutData < sizeof( PORTSETTINGS )))
                 return( ERROR_INVALID_PARAMETER );
             pSettings = (PPORTSETTINGS) pOutData;
 
@@ -912,7 +917,7 @@ ULONG  APIENTRY SplPdQuery ( PSZ    pszPortName,
                 else {
                     if ( token[ strlen(token) - 1 ] == ';')
                         token[ strlen(token) - 1 ] = '\0';
-                    strncpy( pSettings->szHost, token, STR_LEN_QUEUENAME );
+                    strncpy( pSettings->szQueue, token, STR_LEN_QUEUENAME );
                 }
             }
             *pcbOutData = sizeof( PORTSETTINGS );

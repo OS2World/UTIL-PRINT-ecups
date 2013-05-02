@@ -3,6 +3,7 @@
 
 BASE=CUPS
 DEF_PORTNAME=CUPS
+DESCR="CUPS port driver"
 
 ICCOPTS=-Gd-e- -Sp1 -Ss+ -Ms -C+ -Fo$@ -Dcdecl= -D_cdecl= -Rn -O -Wpro -Q+ -Yp+ -Ss+
 LINKOPTS=/NOFREEFORMAT /MAP /A:16 /PM:PM
@@ -19,7 +20,7 @@ $(BASE).PDR:                    $(BASE).DLL
 $(BASE).DLL:                    $(BASE).OBJ \
                                 $(BASE).RES \
                                 $(BASE).DEF
-        @makedesc -Rcups.def -N"netlabs.org" -V"^#define=DRIVER_VERSION,cups.h" cups.def
+        @makedesc -D$(DESCR) -N"netlabs.org" -V"^#define=DRIVER_VERSION,cups.h" cups.def
         ILINK $(LINKOPTS) @<<
 $(BASE)
 $(BASE).DLL
