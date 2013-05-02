@@ -1,5 +1,5 @@
 LIBRARY CUPS INITINSTANCE TERMINSTANCE
-DESCRIPTION '@#netlabs.org:1.03#@##1## 16 Feb 2011 20:53:08     sigel::::::@@@#netlabs.org:1.03#@##1## 16 Feb 2011 20:08:22     sigel::::::@@@#netlabs.org:1.'
+DESCRIPTION '@#netlabs.org:1.04#@##1## 1 May 2013 21:45:10      REINFORCE::::::@@CUPS port driver'
 PROTMODE
 DATA MULTIPLE NONSHARED LOADONCALL
 CODE LOADONCALL
