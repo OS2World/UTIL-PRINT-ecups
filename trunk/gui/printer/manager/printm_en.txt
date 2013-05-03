@@ -19,7 +19,7 @@ PTM0014I: Yes
 PTM0015I: No
 PTM0016I: Operation Successful
 PTM0017I: Continue
-PTM0018?:
+PTM0018I: Operation Failed
 PTM0019?:
 ; ------- [20-99]: Menus
 ; - (Some of these are duplicated so that they can use different shortcut keys)
@@ -215,7 +215,7 @@ PTM0200I: Please Confirm
 PTM0201I: Delete printer "%1"?
 PTM0202I: Delete port %1?
 PTM0203I: Delete driver "%1"?
-PTM0204?:
+PTM0204I: Printer "%1" points to the local CUPS queue "%2" via port %3.  Delete this CUPS queue and port as well?
 PTM0205I: Add a new port of type %1?
 PTM0206?:
 PTM0207?:
@@ -251,4 +251,27 @@ PTM0236I: Import PostScript Printer Description
 PTM0237I: You cannot import a PPD file unless you have either CUPS or at least one legacy PostScript driver installed.
 PTM0238I: The PPD has been imported.
 PTM0239?:
+PTM0240?:
+PTM0241?:
+PTM0242?:
+PTM0243?:
+PTM0244?:
+PTM0245?:
+PTM0246?:
+PTM0247?:
+PTM0248?:
+PTM0249?:
+; CUPS errors
+PTM0250I: The CUPS printer %1 could not be created (CUPS return code %2).
+PTM0251I: The CUPS printer %1 could not be deleted (CUPS return code %2).
+PTM0252?:
+PTM0253?:
+PTM0254?:
+PTM0255?:
+PTM0256?:
+PTM0257?:
+PTM0258?:
+PTM0259?:
+
+
 
