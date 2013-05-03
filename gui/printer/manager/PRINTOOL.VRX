@@ -118,6 +118,13 @@ CheckPrograms: PROCEDURE EXPOSE globals.
     IF globals.!programs.!gzip == '' THEN
         globals.!programs.!gzip = STREAM( globals.!mydir'\gzip.exe', 'C', 'QUERY EXISTS')
 
+    IF globals.!hascups THEN DO
+        globals.!programs.!lpadmin   = STREAM( globals.!cupsdir'\sbin\lpadmin.exe',  'C', 'QUERY EXISTS')
+        globals.!programs.!lpinfo    = STREAM( globals.!cupsdir'\sbin\lpinfo.exe',   'C', 'QUERY EXISTS')
+        globals.!programs.!lpoptions = STREAM( globals.!cupsdir'\bin\lpoptions.exe', 'C', 'QUERY EXISTS')
+        globals.!programs.!lpstat    = STREAM( globals.!cupsdir'\bin\lpstat.exe',    'C', 'QUERY EXISTS')
+    END
+
 RETURN
 
 /*:VRX         CN_DEVICES_ContextMenu
@@ -187,6 +194,40 @@ RETURN
 CN_PRINTERS_DoubleClick:
     CALL PrinterOpen VRInfo("Record")
 RETURN
+
+/*:VRX         CupsDeletePrinter
+*/
+CupsDeletePrinter: PROCEDURE EXPOSE globals.
+    PARSE ARG _host, _dest
+
+    IF TRANSLATE( _host ) <> 'LOCALHOST' THEN
+        del_cmd = globals.!programs.!lpadmin '-h' _host '-d' _dest
+    ELSE
+        del_cmd = globals.!programs.!lpadmin '-d' _dest
+    CALL LINEOUT globals.!log1, 'Delete CUPS destination' _dest' with:'  del_cmd
+
+    nq = RXQUEUE('CREATE')
+    oq = RXQUEUE('SET', nq )
+    ADDRESS CMD '@' del_cmd '2>&1 | RXQUEUE' nq
+    DO QUEUED()
+        PARSE PULL _output
+        CALL LINEOUT globals.!log2, _output
+        IF LEFT( _output, 8 ) == 'Password' & RIGHT( STRIP( _output ), 1 ) == '?' THEN DO
+            CALL SysSleep 1
+            CALL CHAROUT, '0d0a'x
+        END
+    END
+    CALL RXQUEUE 'SET',    oq
+    CALL RXQUEUE 'DELETE', nq
+/*
+    ADDRESS CMD '@' del_cmd '2>&1 >>' globals.!log2
+*/
+
+    CALL LINEOUT globals.!log2, ''
+    CALL LINEOUT globals.!log2
+    CALL LINEOUT globals.!log1, ''
+
+RETURN rc
 
 /*:VRX         DriverAdd
 */
@@ -672,11 +713,32 @@ Init:
 
 RETURN
 
+/*:VRX         InitMessageLog
+*/
+/* Initialize the message logfile.  Unlike the error log, which is cleared and
+ * recreated every time the program starts, the message log is appended to
+ * until it reaches 100kB in size.  If the message log is larger than 100kB when
+ * this function is called, it is renamed (with '~' appended to the  name) and
+ * a new message log is started.
+ */
+InitMessageLog: PROCEDURE EXPOSE globals.
+
+    logsize = STREAM( globals.!log1, 'C', 'QUERY SIZE')
+    IF ( logsize <> '') & ( logsize > 102400 ) THEN DO
+        CALL VRCopyFile globals.!log1, globals.!log1 || '~'
+        CALL VRDeleteFile globals.!log1
+    END
+
+    datestr = DATE('L') TIME('N')
+    CALL LINEOUT globals.!log1, '--[' datestr ']' ||,
+                 COPIES('-', 73 - LENGTH( datestr ))
+RETURN
+
 /*:VRX         LoadSettings
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.21'
+    globals.!version = '0.3'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -691,9 +753,7 @@ LoadSettings: PROCEDURE EXPOSE globals.
     ELSE
         cupsdrv = STRIP( cupsdrv, 'T', '\')
     globals.!cupsdir = cupsdrv'\cups'
-
-    /** TODO Identify if CUPS and/or CUPS.PDR is installed */
-    globals.!hascups = 1
+    globals.!hascups = VRIsDir( globals.!cupsdir )
 
     /* Get system paths.
      */
@@ -710,8 +770,12 @@ LoadSettings: PROCEDURE EXPOSE globals.
     IF globals.!logdir == '' THEN
         globals.!logdir = globals.!mydir
 
-    globals.!log1 = globals.!logdir'\printmgr.l1'
-    globals.!log2 = globals.!logdir'\printmgr.l2'
+    globals.!log1 = globals.!logdir'\printman.l1'
+    globals.!log2 = globals.!logdir'\printman.l2'
+    CALL InitMessageLog
+    IF VRFileExists( globals.!log2 ) THEN
+        CALL VRDeleteFile globals.!log2
+
 
     /* Get printer-related paths.
      */
@@ -943,10 +1007,11 @@ New_CUPS: PROCEDURE EXPOSE globals.
     IF cupswiz <> '' THEN DO
         od = DIRECTORY()
         CALL DIRECTORY _workdir
-        IF ppd_file <> '' & VRFileExists( ppd_file ) THEN 
+        IF ppd_file <> '' & VRFileExists( ppd_file ) THEN
             _parms = _parms ppd_file
         ADDRESS CMD 'start' cupswiz _parms
         CALL DIRECTORY od
+        CALL Quit
     END
 
 RETURN
@@ -956,6 +1021,7 @@ RETURN
 New_LAN: PROCEDURE EXPOSE globals.
 
     ok = OpenPrinterTemplate('WPRPrinter')
+    CALL Quit
 
 RETURN ok
 
@@ -964,6 +1030,7 @@ RETURN ok
 New_Standard: PROCEDURE EXPOSE globals.
 
     ok = OpenPrinterTemplate('WPPrinter')
+    CALL Quit
 
 RETURN ok
 
@@ -1403,19 +1470,46 @@ PrinterDelete: PROCEDURE EXPOSE globals.
         IF ok == 0 | recs.0 < 1 THEN RETURN 0
         record = recs.1
     END
+    CALL VRMethod 'CN_PRINTERS', 'SetRecordAttr', record, 'Source', 0
 
     success = 0
     _title = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!title )
     _queue = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!queue )
+    _port  = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!port )
+
     _btns.0 = 2
     _btns.1 = NLSGetMessage( 14 )
     _btns.2 = NLSGetMessage( 15 )
     _confirm = VRMessage('WN_MAIN', NLSGetMessage( 201, _title ), NLSGetMessage( 200 ), 'Q', '_btns.', 2, 2 )
     IF _confirm == 1 THEN DO
         success = RPUPrinterDelete( _queue )
+        CALL RPUPortInfo _port, 'port.'
+        IF port.!driver == 'CUPS' THEN DO
+            /* If this corresponds to a locally-defined CUPS queue, offer to
+             * to delete that as well.
+             */
+            cups_prnt = RPUPortQuery('CUPS', _port )
+            IF cups_prnt <> '' & ( LENGTH( cups_prnt ) == 130 ) THEN DO
+                PARSE VAR cups_prnt 1 _cups_host 66 _cups_queue
+                PARSE VAR _cups_host cups_host '00'x .
+                PARSE VAR _cups_queue cups_queue '00'x .
+                IF ( TRANSLATE( cups_host ) == 'LOCALHOST') | cups_host = '127.0.0.1' THEN DO
+                    _confirm = VRMessage('WN_MAIN', NLSGetMessage( 204, _title, cups_queue, _port ),,
+                                          NLSGetMessage( 200 ), 'Q', '_btns.', 2, 2 )
+                    IF _confirm == 1 THEN DO
+                        success = CupsDeletePrinter( cups_host, cups_queue )
+                        IF success == 0 THEN 
+                            CALL RPUPortDelete _port
+                        ELSE
+                            CALL VRMessage 'WN_MAIN', NLSGetMessage( 251, cups_queue, success ), NLSGetMessage( 18 ), 'E'
+                    END
+                END
+            END
+        END
     END
 
-    CALL VRMethod 'CN_PRINTERS', 'SetRecordAttr', record, 'Source', 0
+    CALL RefreshPrinters
+
 RETURN success
 
 /*:VRX         PrinterHold
