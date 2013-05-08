@@ -492,6 +492,22 @@ InstallPrintDriver: PROCEDURE EXPOSE globals.
     END
 RETURN ok
 
+/*:VRX         DeletePrintDriver
+*/
+/* Removes (that is to say, de-registers with the spooler) a PM printer
+ * device driver/model.
+ *
+ *   driver     - The name of the printerpak driver (without path or extension)
+ *   model      - The printer make/model name used by the driver
+ *
+ * Returns: 0 on success, 1 on error
+ */
+DeletePrintDriver: PROCEDURE EXPOSE globals.
+    PARSE ARG driver, model
+
+    ok = VRDelIni('PM_SPOOLER_DD', driver'.'model, 'SYSTEM')
+RETURN ok
+
 /*:VRX         CreatePrinterObject
 */
 /* Create the specified printer using SysCreateObject (this should create the
@@ -805,4 +821,47 @@ NLSSetText: PROCEDURE EXPOSE globals.
     ELSE               CALL VRSet control, property, text
 
 RETURN success
+
+/*:VRX         StringTokenize
+*/
+StringTokenize:
+    PARSE ARG string, separator, __stem
+    CALL __StringTokenize string, separator, __stem
+    DROP __stem
+RETURN
+
+/*:VRX         __StringTokenize
+*/
+__StringTokenize: PROCEDURE EXPOSE (__stem)
+    PARSE ARG string, separator, tokens
+
+    /* Note: this differs slightly from my usual implementation in that
+     * each token is STRIPped of leading and trailing spaces.
+     */
+
+    IF ( string = '') THEN RETURN string
+    IF ( separator = '') THEN separator = ' '
+
+    i = 0
+    CALL VALUE tokens || '0', i
+    DO WHILE LENGTH( string ) > 0
+        x = 1
+        y = POS( separator, string, x )
+        IF y > 0 THEN DO
+            current = SUBSTR( string, 1, y-1 )
+            x = y + 1
+            i = i + 1
+            CALL VALUE tokens || 'i', STRIP( current )
+        END
+        ELSE DO
+            current = STRIP( string, 'B', separator )
+            i = i + 1
+            CALL VALUE tokens || 'i', STRIP( current )
+            x = LENGTH( string ) + 1
+        END
+        string = SUBSTR( string, x )
+    END
+    CALL VALUE tokens || '0', i
+
+RETURN
 

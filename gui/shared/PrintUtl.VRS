@@ -181,7 +181,7 @@ PrinterExistsInDRV: PROCEDURE EXPOSE globals.
     PARSE UPPER ARG driver_name, printer_name
     printer_name = TRANSLATE( printer_name, '_', '.')
 
-    printer_drv = globals.!bootdrv'\OS2\DLL\'driver_name'\'driver_name'.DRV'
+    printer_drv = globals.!os2dir'\DLL\'driver_name'\'driver_name'.DRV'
     /* ?? TODO: install driver_name if not found (prompt first) ?? */
 
     IF SysGetEA( printer_drv, '.EXPAND', 'exist_ea') <> 0 THEN RETURN 0
@@ -534,12 +534,15 @@ CleanPPD: PROCEDURE
             WHEN LEFT( line, 7  ) == '*StpStp'            THEN NOP
             WHEN LEFT( line, 18 ) == '*StpResolutionMap:' THEN NOP
             WHEN LEFT( line, 14 ) == '*OPOptionHints'     THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*da.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*de.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*es.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*fi.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*fr.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*it.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*ja.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*ko.'               THEN NOP
+            WHEN LEFT( line, 4 ) ==  '*nb.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*nl.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*pt.'               THEN NOP
             WHEN LEFT( line, 4 ) ==  '*sv.'               THEN NOP
@@ -580,7 +583,7 @@ RETURN
 MatchPrinterModel: PROCEDURE EXPOSE globals. models.
     PARSE UPPER ARG driver_name, printer_name
     printer_name = TRANSLATE( printer_name, '_', '.')
-    printer_drv = globals.!bootdrv'\OS2\DLL\'driver_name'\'driver_name'.DRV'
+    printer_drv = globals.!os2dir'\DLL\'driver_name'\'driver_name'.DRV'
     models.0 = 0
 
     IF SysGetEA( printer_drv, '.EXPAND', 'exist_ea') <> 0 THEN RETURN 0

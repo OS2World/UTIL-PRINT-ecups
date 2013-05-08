@@ -97,6 +97,8 @@ return
 */
 CheckPrograms: PROCEDURE EXPOSE globals.
 
+    globals.!hascups = 0
+
     /* See if CUPSLPR.EXE (required by CUPS.PDR) is installed.
      */
     tcpipbin = SysSearchPath('PATH', 'inetd.exe')
@@ -110,6 +112,18 @@ CheckPrograms: PROCEDURE EXPOSE globals.
     IF globals.!programs.!cupslpr == '' THEN
         globals.!programs.!cupslpr = STREAM( globals.!mydir'\cupslpr.exe', 'C', 'QUERY EXISTS')
 
+    /* See if CUPS.PDR is installed.
+     */
+    IF globals.!programs.!cupslpr <> '' THEN DO
+        cups_pdr = VRGetIni('PM_PORT_DRIVER', 'CUPS', 'System')
+        IF cups_pdr == '' THEN DO
+            cups_pdr = STREAM( globals.!bootdrv'\OS2\DLL\CUPS.PDR', 'C', 'QUERY EXISTS')
+            IF cups_pdr <> '' THEN CALL VRSetIni('PM_PORT_DRIVER', 'CUPS', cups_pdr, 'System')
+        END
+        IF cups_pdr <> '' THEN
+            globals.!hascups = 1
+    END
+
     /* See if GZIP.EXE is installed (required for unpacking CUPS PPDs).
      */
     globals.!programs.!gzip = SysSearchPath('PATH', 'gzip.exe')
@@ -118,12 +132,12 @@ CheckPrograms: PROCEDURE EXPOSE globals.
     IF globals.!programs.!gzip == '' THEN
         globals.!programs.!gzip = STREAM( globals.!mydir'\gzip.exe', 'C', 'QUERY EXISTS')
 
-    IF globals.!hascups THEN DO
-        globals.!programs.!lpadmin   = STREAM( globals.!cupsdir'\sbin\lpadmin.exe',  'C', 'QUERY EXISTS')
-        globals.!programs.!lpinfo    = STREAM( globals.!cupsdir'\sbin\lpinfo.exe',   'C', 'QUERY EXISTS')
-        globals.!programs.!lpoptions = STREAM( globals.!cupsdir'\bin\lpoptions.exe', 'C', 'QUERY EXISTS')
-        globals.!programs.!lpstat    = STREAM( globals.!cupsdir'\bin\lpstat.exe',    'C', 'QUERY EXISTS')
-    END
+    /* Try and find some other CUPS programs we use.
+     */
+    globals.!programs.!lpadmin   = STREAM( globals.!cupsdir'\sbin\lpadmin.exe',  'C', 'QUERY EXISTS')
+    globals.!programs.!lpinfo    = STREAM( globals.!cupsdir'\sbin\lpinfo.exe',   'C', 'QUERY EXISTS')
+    globals.!programs.!lpoptions = STREAM( globals.!cupsdir'\bin\lpoptions.exe', 'C', 'QUERY EXISTS')
+    globals.!programs.!lpstat    = STREAM( globals.!cupsdir'\bin\lpstat.exe',    'C', 'QUERY EXISTS')
 
 RETURN
 
@@ -201,27 +215,31 @@ CupsDeletePrinter: PROCEDURE EXPOSE globals.
     PARSE ARG _host, _dest
 
     IF TRANSLATE( _host ) <> 'LOCALHOST' THEN
-        del_cmd = globals.!programs.!lpadmin '-h' _host '-d' _dest
+        del_cmd = globals.!programs.!lpadmin '-h' _host '-x' _dest
     ELSE
-        del_cmd = globals.!programs.!lpadmin '-d' _dest
+        del_cmd = globals.!programs.!lpadmin '-x' _dest
     CALL LINEOUT globals.!log1, 'Delete CUPS destination' _dest' with:'  del_cmd
 
+/*
     nq = RXQUEUE('CREATE')
     oq = RXQUEUE('SET', nq )
     ADDRESS CMD '@' del_cmd '2>&1 | RXQUEUE' nq
     DO QUEUED()
         PARSE PULL _output
         CALL LINEOUT globals.!log2, _output
-        IF LEFT( _output, 8 ) == 'Password' & RIGHT( STRIP( _output ), 1 ) == '?' THEN DO
+        IF LEFT( _output, 12 ) == 'Password for' & RIGHT( STRIP( _output ), 1 ) == '?' THEN DO
             CALL SysSleep 1
-            CALL CHAROUT, '0d0a'x
+            PUSH '0d0a'x
         END
     END
     CALL RXQUEUE 'SET',    oq
     CALL RXQUEUE 'DELETE', nq
-/*
-    ADDRESS CMD '@' del_cmd '2>&1 >>' globals.!log2
 */
+
+    _od = DIRECTORY()
+    CALL DIRECTORY VRParseFileName( globals.!programs.!lpadmin, 'DP')
+    ADDRESS CMD '@' del_cmd '2>&1 >>' globals.!log2
+    CALL DIRECTORY _od
 
     CALL LINEOUT globals.!log2, ''
     CALL LINEOUT globals.!log2
@@ -237,7 +255,54 @@ RETURN
 
 /*:VRX         DriverDelete
 */
-DriverDelete: PROCEDURE EXPOSE globals
+DriverDelete: PROCEDURE EXPOSE globals.
+    PARSE ARG record
+    IF record == '' THEN DO
+        ok = VRMethod( "CN_DEVICES", "GetRecordList", "Selected", "recs." )
+        IF ok == 0 | recs.0 < 1 THEN RETURN
+        record = recs.1
+    END
+    CALL VRMethod 'CN_DEVICES', 'SetRecordAttr', record, 'Source', 0
+
+    _name   = VRMethod('CN_DEVICES', 'GetFieldData', record, globals.!hcfDevices.!model )
+    _driver = VRMethod('CN_DEVICES', 'GetFieldData', record, globals.!hcfDevices.!driver )
+    IF _name == '' THEN RETURN
+    IF _driver == '' THEN RETURN
+
+    IF _driver == 'IBMNULL' THEN DO
+        CALL VRMessage 'WN_MAIN', NLSGetMessage( 212 ), NLSGetMessage( 209 ), 'W'
+        RETURN
+    END
+
+    device_name = _driver'.'_name
+    device_in_use = 0
+    printers.0 = 0
+    CALL RPUEnumPrinters 'printers.'
+    DO i = 1 TO printers.0
+        CALL RPUPrinterQuery printers.i.!name, 'details.'
+        CALL StringTokenize details.!drivers, ',', 'used_dev.'
+        DO j = 1 TO used_dev.0
+            IF used_dev.j == device_name THEN DO
+                device_in_use = 1
+                LEAVE
+            END
+        END
+        IF device_in_use == 1 THEN DO
+            _title = TRANSLATE( printers.i.!description, '  ', '0d0a'x)
+            CALL VRMessage 'WN_MAIN', NLSGetMessage( 208, device_name, _title ), NLSGetMessage( 209 ), 'W'
+            RETURN
+        END
+    END
+
+    _btns.0 = 2
+    _btns.1 = NLSGetMessage( 14 )
+    _btns.2 = NLSGetMessage( 15 )
+    _confirm = VRMessage('WN_MAIN', NLSGetMessage( 203, device_name ), NLSGetMessage( 200 ), 'Q', '_btns.', 2, 2 )
+    IF _confirm == 1 THEN DO
+        success = DeletePrintDriver( _driver, _name )
+        IF success == 1 THEN CALL RefreshDevices
+        /* TODO check if any other _driver definitions exist and if not, offer to delete _driver files & profile */
+    END
 
 RETURN
 
@@ -738,7 +803,7 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.3'
+    globals.!version = '0.31'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -753,7 +818,6 @@ LoadSettings: PROCEDURE EXPOSE globals.
     ELSE
         cupsdrv = STRIP( cupsdrv, 'T', '\')
     globals.!cupsdir = cupsdrv'\cups'
-    globals.!hascups = VRIsDir( globals.!cupsdir )
 
     /* Get system paths.
      */
@@ -1125,6 +1189,7 @@ PB_IMPORTOK_Click: PROCEDURE EXPOSE globals. new_ppd
     IF VRGet('RB_IMPORTCUPS', 'Set') == 1 THEN DO
         CALL New_CUPS new_ppd
         CALL SW_IMPORT_Close
+        CALL VRSet 'WN_MAIN', 'Shutdown', 1
         RETURN
     END
     driver = VRGet('DDCB_IMPORTDRV', 'Value')
@@ -1417,14 +1482,28 @@ RETURN
 
 /*:VRX         PortDelete
 */
-PortDelete: PARSE ARG record
+PortDelete: PROCEDURE EXPOSE globals.
+    PARSE ARG record
     IF record == '' THEN DO
         ok = VRMethod( "CN_PORTS", "GetRecordList", "Selected", "recs." )
         IF ok == 0 | recs.0 < 1 THEN RETURN
         record = recs.1
     END
+    CALL VRMethod 'CN_PORTS', 'SetRecordAttr', record, 'Source', 0
 
     _name = VRMethod('CN_PORTS', 'GetFieldData', record, globals.!hcfPorts.!name )
+
+    printers.0 = 0
+    CALL RPUEnumPrinters 'printers.'
+    DO i = 1 TO printers.0
+        CALL RPUPrinterQuery printers.i.!name, 'details.'
+        IF _name == details.!port THEN DO
+            _title = TRANSLATE( printers.i.!description, '  ', '0d0a'x)
+            CALL VRMessage 'WN_MAIN', NLSGetMessage( 206, _name, _title ), NLSGetMessage( 207 ), 'W'
+            RETURN
+        END
+    END
+
     IF _name == '' THEN RETURN
     _btns.0 = 2
     _btns.1 = NLSGetMessage( 14 )
@@ -1434,8 +1513,6 @@ PortDelete: PARSE ARG record
         success = RPUPortDelete( _name )
         IF success == 1 THEN CALL RefreshPorts
     END
-
-    CALL VRMethod 'CN_PRINTERS', 'SetRecordAttr', record, 'Source', 0
 
 RETURN
 
@@ -1498,8 +1575,10 @@ PrinterDelete: PROCEDURE EXPOSE globals.
                                           NLSGetMessage( 200 ), 'Q', '_btns.', 2, 2 )
                     IF _confirm == 1 THEN DO
                         success = CupsDeletePrinter( cups_host, cups_queue )
-                        IF success == 0 THEN 
+                        IF success == 0 THEN DO
                             CALL RPUPortDelete _port
+                            CALL RefreshPorts
+                        END
                         ELSE
                             CALL VRMessage 'WN_MAIN', NLSGetMessage( 251, cups_queue, success ), NLSGetMessage( 18 ), 'E'
                     END

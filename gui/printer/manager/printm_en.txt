@@ -217,13 +217,13 @@ PTM0202I: Delete port %1?
 PTM0203I: Delete driver "%1"?
 PTM0204I: Printer "%1" points to the local CUPS queue "%2" via port %3.  Delete this CUPS queue and port as well?
 PTM0205I: Add a new port of type %1?
-PTM0206?:
-PTM0207?:
-PTM0208?:
-PTM0209?:
+PTM0206I: Port %1 cannot be deleted, as it is currently assigned to the printer "%2".
+PTM0207I: Port In Use
+PTM0208I: Driver "%1" cannot be deleted, as it is currently in use by the printer "%2".
+PTM0209I: Device In Use
 PTM0210I: No Properties
 PTM0211I: There are no properties available for the port %1.
-PTM0212?:
+PTM0212I: The IBMNULL driver cannot be deleted.
 PTM0213?:
 PTM0214?:
 PTM0215?:
