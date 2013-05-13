@@ -6,12 +6,12 @@ PTM0001I: Manage Printers
 PTM0002I: OK
 PTM0003I: Cancel
 PTM0004I: Help
-PTM0005I: ~New
+PTM0005I: ~New...
 PTM0006I: ~Delete
 PTM0007I: ~Open
-PTM0008I: ~Install
+PTM0008I: ~Install...
 PTM0009I: ~Remove
-PTM0010I: ~Properties
+PTM0010I: ~Properties...
 PTM0011I: Next ~>
 PTM0012I: ~Close
 PTM0013I: Error
@@ -38,13 +38,13 @@ PTM0031I: ~Open
 PTM0032I: ~Properties...
 PTM0033I: Pause ~queue
 PTM0034I: ~Default printer
-PTM0035I: ~Create new
+PTM0035I: ~Install...
 PTM0036I: Dele~te
 PTM0037?:
 PTM0038?:
 PTM0039?:
 PTM0040I: P~ort
-PTM0041I: ~Add new
+PTM0041I: ~Install...
 PTM0042I: ~Delete
 PTM0043I: ~Properties...
 PTM0044?:
@@ -54,8 +54,8 @@ PTM0047?:
 PTM0048?:
 PTM0049?:
 PTM0050I: ~Driver
-PTM0051I: ~Install
-PTM0052I: ~Remove
+PTM0051I: ~Install...
+PTM0052I: ~Delete
 PTM0053?:
 PTM0054?:
 PTM0055?:
@@ -177,7 +177,7 @@ PTM0164I: Other...
 PTM0165I: Select Port Driver
 PTM0166I: Failed to install port driver.
 PTM0167I: Failed to create port:
-PTM0168?:
+PTM0168I: Failed to install driver for "%1".
 PTM0169?:
 ; ------- PrinterPak management dialog
 PTM0170I: Manage Presentation Drivers
@@ -272,6 +272,28 @@ PTM0256?:
 PTM0257?:
 PTM0258?:
 PTM0259?:
+; Device installation dialog
+PTM0260I: Install Printer Device Driver
+; ("%1" in the next two strings will be replaced with either "OS/2" or "eComStation")
+PTM0261I: Printer driver shipped with %1
+PTM0262I: Other %1 printer driver:
+PTM0263?:
+PTM0264I: Supported devices
+PTM0265I: Device Name
+PTM0266I: Presentation Driver
+PTM0267?:
+PTM0268?:
+PTM0269?:
+PTM0270?:
+PTM0271?:
+PTM0272?:
+PTM0273?:
+PTM0274?:
+PTM0275?:
+PTM0276?:
+PTM0277?:
+PTM0278?:
+PTM0279?:
 
 
 

@@ -1,5 +1,5 @@
 PM Printer Manager
-Version 0.3
+Version 0.41
 
   Printer Manager is a new graphical printer management tool designed to 
   replace several older, separate programs by integrating their functions
@@ -24,6 +24,21 @@ INSTALLATION
   Place the contents of the ZIP file into any directory, and create a
   program object for PRINTMAN.EXE.  Make sure the first three DLLs listed
   above are installed on your system (via the LIBPATH).
+
+
+KNOWN PROBLEMS/LIMITATIONS
+
+  At the moment, choosing to create a printer causes Printer Manager to just
+  launch the appropriate external printer wizard and then exit.  Eventually
+  this should all be handled by Printer Manager itself.
+
+  If the CUPS server (local or remote) requires password authentication for
+  the use of commands like lpadmin, lpinfo, etc. then these programs will 
+  block waiting for a password during various operations.  (There doesn't seem
+  to be any way to fix this other than replacing the programs entirely... I'm
+  still looking at possible solutions.)
+
+  There is no help file.
 
 
 LICENSE
