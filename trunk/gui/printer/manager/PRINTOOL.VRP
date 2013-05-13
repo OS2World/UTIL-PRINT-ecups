@@ -3,12 +3,12 @@ VRX: PRINTOOL.VRX
 VXOFile: VROBJEX
 MacroPath: VRM:G:\netlabs\svn\ecups\trunk\gui\printer\manager
 EXEPath: G:\netlabs\svn\ecups\trunk\gui\printer\manager\PRINTMAN.EXE
-RunParameters:
-RunDirectory:
-VRXWindow: __VREMainWindow,1,494,3999,6697,8106
-VRXWindow: __VRESectionListWindow,1,1710,13731,4204,4059
-VRXWindow: __VREToolsWindow,1,1710,11997,4963,1669
-VRXWindow: __VREWindListWindow,1,6035,13731,3385,4059
+RunParameters: 
+RunDirectory: 
+VRXWindow: __VREMainWindow,1,554,4095,6697,8046
+VRXWindow: __VRESectionListWindow,1,687,16044,4204,4059
+VRXWindow: __VREToolsWindow,1,687,14309,4963,1669
+VRXWindow: __VREWindListWindow,1,4902,16044,3505,4059
 UserFile: 1
 UserWindow: WN_MAIN,1
 UserWindow: SW_WIZARD,1
@@ -20,3 +20,4 @@ UserWindow: SW_ABOUT,1
 UserWindow: SW_PORT_ADD,1
 UserWindow: SW_MODELS,1
 UserWindow: SW_IMPORT,1
+UserWindow: SW_DEVICE_ADD,1

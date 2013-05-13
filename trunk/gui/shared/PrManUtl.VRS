@@ -24,6 +24,8 @@ RETURN drv_path
  * - globals.!prdrv:      filespec of \OS2\INSTALL\PRDRV.LST
  * - globals.!repository: value indicated by PM_INSTALL->PDR_DIR in OS2.INI
  *
+ * Arguments: The print driver name without path or extension
+ *
  * Returns the path, or '' if not found.  Also, 'pmdx' will be 0-9 if the
  * driver is in the repository (indicating the repository subdirectory), or
  * '' if the driver is not in the repository.
@@ -90,6 +92,8 @@ RETURN drv_file
 /* Check to see which repository directory the specified driver resides in.
  * Returns the number suffix of the PMDD_* subdirectory name, or '' if either
  * the driver or the index file could not be located.
+ *
+ * Arguments: The print driver name without path or extension
  */
 GetDriverPMDD: PROCEDURE
     PARSE ARG driver, prdrv_lst
@@ -109,7 +113,13 @@ RETURN pmdx
 
 /*:VRX         LocateDriverFiles
 */
-/* Returns:
+/* Locates the source files for a PostScript-based driver that will be required in
+ * order to import a PPD using PIN.  Not to be used with non-PostScript drivers,
+ * since it will fail if PIN or PPDENC are not found.
+ *
+ * Arguments: The print driver name without path or extension
+ *
+ * Returns:
  *   0 - Driver files not found.
  *   1 - Driver files found, path saved in 'driver_path'; 'driver_repo' will be 1
  *       if the driver is 'shipped' (i.e. defined in PRDRV.LST) or 0 otherwise.
@@ -480,9 +490,11 @@ InstallPrintDriver: PROCEDURE EXPOSE globals.
     ok = 0
     targetdir = globals.!os2dir'\DLL\'driver
     targetdrv = targetdir'\'driver'.DRV'
+    CALL LINEOUT globals.!log1, 'Installing' driver'.'model 'from' driverfull '(target' targetdrv')'
+
     IF ( VRFileExists( targetdrv ) == 0 ) THEN DO
         CALL VRMkDir targetdir
-        r = CopyDriverToSource( driverfull, targetdir )
+        r = CopyPrinterPak( driverfull, targetdir )
         IF r <> 1 THEN ok = 1
     END
     IF ok == 0 THEN DO

@@ -155,6 +155,13 @@ CN_DEVICES_ContextMenu:  PROCEDURE EXPOSE globals.
 
 RETURN
 
+/*:VRX         CN_DEVICES_KeyPress
+*/
+CN_DEVICES_KeyPress: 
+    IF VRGet('CN_DEVICES', 'KeyString') == '{Backtab}' THEN
+        CALL VRMethod 'TDL_MAIN', 'SetFocus'
+return
+
 /*:VRX         CN_PORTS_ContextMenu
 */
 CN_PORTS_ContextMenu: PROCEDURE EXPOSE globals.
@@ -169,6 +176,13 @@ CN_PORTS_ContextMenu: PROCEDURE EXPOSE globals.
     END
 
 RETURN
+
+/*:VRX         CN_PORTS_KeyPress
+*/
+CN_PORTS_KeyPress: 
+    IF VRGet('CN_PORTS', 'KeyString') == '{Backtab}' THEN
+        CALL VRMethod 'TDL_MAIN', 'SetFocus'
+return
 
 /*:VRX         CN_PRINTERPAKS_ContextMenu
 */
@@ -209,6 +223,13 @@ CN_PRINTERS_DoubleClick:
     CALL PrinterOpen VRInfo("Record")
 RETURN
 
+/*:VRX         CN_PRINTERS_KeyPress
+*/
+CN_PRINTERS_KeyPress: 
+    IF VRGet('CN_PRINTERS', 'KeyString') == '{Backtab}' THEN
+        CALL VRMethod 'TDL_MAIN', 'SetFocus'
+RETURN
+
 /*:VRX         CupsDeletePrinter
 */
 CupsDeletePrinter: PROCEDURE EXPOSE globals.
@@ -247,10 +268,46 @@ CupsDeletePrinter: PROCEDURE EXPOSE globals.
 
 RETURN rc
 
+/*:VRX         DDCB_DEVICE_3RDPARTY_Click
+*/
+DDCB_DEVICE_3RDPARTY_Click: PROCEDURE EXPOSE globals. shipped.
+    new_path = TRANSLATE( STRIP( VRGet('DDCB_DEVICE_3RDPARTY', 'SelectedString')))
+    IF new_path == '' THEN RETURN
+
+    old_path = VRGet('DDCB_DEVICE_3RDPARTY', 'UserData')
+    IF old_path == new_path THEN RETURN
+
+    CALL SetDriverList new_path
+RETURN
+
+/*:VRX         DDCB_DEVICE_3RDPARTY_Verify
+*/
+DDCB_DEVICE_3RDPARTY_Verify: PROCEDURE EXPOSE globals. shipped.
+    old_path = VRGet('DDCB_DEVICE_3RDPARTY', 'UserData')
+    new_path = TRANSLATE( STRIP( VRGet('DDCB_DEVICE_3RDPARTY', 'Value')))
+    IF new_path == '' THEN DO
+        IF old_path <> '' THEN CALL VRSet 'DDCB_DEVICE_3RDPARTY', 'Value', old_path
+        RETURN
+    END
+
+    new_path = VRExpandFileName( new_path )
+    IF new_path == '' THEN DO
+        IF old_path <> '' THEN CALL VRSet 'DDCB_DEVICE_3RDPARTY', 'Value', old_path
+        RETURN
+    END
+
+    IF old_path == new_path THEN RETURN
+
+    CALL SetDriverList new_path
+RETURN
+
 /*:VRX         DriverAdd
 */
 DriverAdd: PROCEDURE EXPOSE globals.
-
+    updated = 0
+    CALL VRLoadSecondary 'SW_DEVICE_ADD', 'W'
+    IF updated == 1 THEN
+        CALL RefreshDevices
 RETURN
 
 /*:VRX         DriverDelete
@@ -414,6 +471,26 @@ GetPrinterPaks: PROCEDURE EXPOSE globals.
     CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
 
 RETURN _count
+
+/*:VRX         GetShippedDrivers
+*/
+GetShippedDrivers: PROCEDURE EXPOSE globals. shipped.
+
+    count = 0
+    CALL LINEIN globals.!prdesc, 1, 0
+    DO WHILE LINES( globals.!prdesc )
+        _next = LINEIN( globals.!prdesc )
+        PARSE VAR _next _desc':' _rest
+        _ppak = SUBSTR( _rest, LASTPOS('(', _rest ))
+        PARSE VAR _ppak '('_drvr')' .
+        count = count + 1
+        shipped.count = ';'_desc';#2;;;NAME;'_desc';DRIVER;'_drvr';'
+    END
+    CALL STREAM globals.!prdesc, 'C', 'CLOSE'
+    shipped.0 = count
+    CALL VRSortStem 'shipped.'
+
+RETURN count
 
 /*:VRX         Halt
 */
@@ -657,7 +734,9 @@ ImportPPD: PROCEDURE EXPOSE globals.
         CALL LINEIN globals.!prdesc, 1, 0
         DO WHILE LINES( globals.!prdesc )
             _next = LINEIN( globals.!prdesc )
-            PARSE UPPER VAR _next WITH . ':' . '('_prdrv')' .
+            PARSE UPPER VAR _next . ':' _rest
+            _tail = SUBSTR( _rest, LASTPOS('(', _rest ))
+            PARSE VAR _tail '('_prdrv')' .
             IF _prdrv == driver'.DRV' THEN ITERATE
             count = count + 1
             defs.count = _next
@@ -737,6 +816,9 @@ RETURN 0
 /*:VRX         Init
 */
 Init:
+    /* Hide the VX-REXX console window
+     */
+    CALL VRSet 'Console', 'WindowListTitle', ''
 
     CALL RxFuncAdd 'SysLoadFuncs',     'REXXUTIL', 'SysLoadFuncs'
     CALL SysLoadFuncs
@@ -772,8 +854,10 @@ Init:
     IF globals.!wizard THEN DO
         CALL VRMethod 'Application', 'PostQueue', 0, 1, 'CALL PB_PRINTER_ADD_Click'
     END
-    ELSE
+    ELSE DO
         CALL VRSet window, "Visible", 1
+        CALL VRMethod 'TDL_MAIN', 'SetFocus'
+    END
     drop window
 
 RETURN
@@ -803,7 +887,7 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.31'
+    globals.!version = '0.41'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -1170,11 +1254,75 @@ PB_DEVICE_ADD_Click:
     CALL DriverAdd
 RETURN
 
+/*:VRX         PB_DEVICE_CANCEL_Click
+*/
+PB_DEVICE_CANCEL_Click:
+    CALL SW_DEVICE_ADD_Close
+RETURN
+
+/*:VRX         PB_DEVICE_INSTALL_Click
+*/
+PB_DEVICE_INSTALL_Click: PROCEDURE EXPOSE globals. updated
+    updated = 1
+
+    ok = VRMethod('CN_DEVICE_LIST', 'GetRecordList', 'Selected', 'recs.')
+    IF ok == 0 THEN RETURN
+    IF recs.0 == 0 THEN RETURN
+    selected = recs.1
+
+    dev_name = VRMethod('CN_DEVICE_LIST', 'GetFieldData', selected, 'NAME')
+    dev_driver = VRMethod('CN_DEVICE_LIST', 'GetFieldData', selected, 'DRIVER')
+    driver_short = TRANSLATE( VRParseFileName( dev_driver, 'N'))
+    IF dev_name == '' | dev_driver == '' | driver_short == '' THEN RETURN
+
+    /* Shipped drivers don't include the FQ path in dev_driver so we must
+     * resolve it first.
+     */
+    IF VRGet('RB_DEVICE_SHIPPED', 'Set') == 1 THEN
+        dev_driver = GetDriverSource( driver_short )
+    IF dev_driver == '' THEN RETURN
+
+    ok = InstallPrintDriver( driver_short, dev_driver, dev_name )
+
+    IF ok <> 0 THEN DO
+        CALL VRMessage VRWindow(), NLSGetMessage( 168, driver_short'.'dev_name ), NLSGetMessage( 13 ), 'E'
+    END
+    CALL SW_DEVICE_ADD_Close
+
+RETURN
+
+/*:VRX         PB_DEVICE_OTHER_Click
+*/
+PB_DEVICE_OTHER_Click: PROCEDURE EXPOSE globals. shipped.
+
+    old_path = VRGet('DDCB_DEVICE_3RDPARTY', 'UserData')
+    new_path = VRXDirectoryDialog( VRWindow(), old_path, NLSGetMessage( 189 ))
+    IF new_path == '' THEN RETURN
+    IF old_path == TRANSLATE( new_path ) THEN RETURN
+
+    CALL VRSet 'DDCB_DEVICE_3RDPARTY', 'Value', new_path
+    CALL SetDriverList new_path
+
+RETURN
+
+/*:VRX         PB_DEVICE_REFRESH_Click
+*/
+PB_DEVICE_REFRESH_Click: PROCEDURE EXPOSE globals. shipped.
+    CALL SetDriverList
+return
+
 /*:VRX         PB_DEVICE_REMOVE_Click
 */
 PB_DEVICE_REMOVE_Click:
     CALL DriverDelete
 RETURN
+
+/*:VRX         PB_DEVICE_REMOVE_KeyPress
+*/
+PB_DEVICE_REMOVE_KeyPress: 
+    IF VRGet('PB_DEVICE_REMOVE', 'KeyString') == '{Tab}' THEN
+        CALL VRMethod 'TDL_MAIN', 'SetFocus'
+return
 
 /*:VRX         PB_IMPORTCANCEL_Click
 */
@@ -1281,6 +1429,19 @@ RETURN
 */
 PB_PORT_DELETE_Click:
     CALL PortDelete
+return
+
+/*:VRX         PB_PORT_EDIT_Click
+*/
+PB_PORT_EDIT_Click: 
+    CALL PortProperties
+return
+
+/*:VRX         PB_PORT_EDIT_KeyPress
+*/
+PB_PORT_EDIT_KeyPress: 
+    IF VRGet('PB_PORT_EDIT', 'KeyString') == '{Tab}' THEN
+        CALL VRMethod 'TDL_MAIN', 'SetFocus'
 return
 
 /*:VRX         PB_PPCLOSE_Click
@@ -1428,6 +1589,19 @@ RETURN
 */
 PB_PRINTER_DEL_Click:
     CALL PrinterDelete
+return
+
+/*:VRX         PB_PRINTER_EDIT_Click
+*/
+PB_PRINTER_EDIT_Click: 
+    CALL PrinterProperties
+RETURN
+
+/*:VRX         PB_PRINTER_EDIT_KeyPress
+*/
+PB_PRINTER_EDIT_KeyPress: 
+    IF VRGet('PB_PRINTER_EDIT', 'KeyString') == '{Tab}' THEN
+        CALL VRMethod 'TDL_MAIN', 'SetFocus'
 return
 
 /*:VRX         PB_PRINTER_OPEN_Click
@@ -1716,6 +1890,25 @@ RB_CREATE_LEGACY_Click: PROCEDURE
     CALL VRSet 'RB_CREATE_LAN',      'Enabled', 1
 RETURN
 
+/*:VRX         RB_DEVICE_3RDPARTY_Click
+*/
+RB_DEVICE_3RDPARTY_Click: PROCEDURE EXPOSE globals. shipped.
+    CALL VRSet 'DDCB_DEVICE_3RDPARTY', 'Enabled', 1
+    CALL VRSet 'PB_DEVICE_OTHER',      'Enabled', 1
+    CALL VRSet 'PB_DEVICE_REFRESH',    'Enabled', 1
+    CALL SetDriverList
+RETURN
+
+/*:VRX         RB_DEVICE_SHIPPED_Click
+*/
+RB_DEVICE_SHIPPED_Click: PROCEDURE EXPOSE globals. shipped.
+    CALL VRSet 'DDCB_DEVICE_3RDPARTY', 'Enabled', 0
+    CALL VRSet 'PB_DEVICE_OTHER',      'Enabled', 0
+    CALL VRSet 'PB_DEVICE_REFRESH',    'Enabled', 0
+    CALL SetDriverList
+RETURN
+
+
 /*:VRX         RefreshDevices
 */
 RefreshDevices: PROCEDURE EXPOSE globals.
@@ -1828,6 +2021,54 @@ RefreshPrinters: PROCEDURE EXPOSE globals.
 
         CALL VRSet 'CN_PRINTERS', 'Painting', 1
     END
+
+RETURN
+
+/*:VRX         SetDriverList
+*/
+SetDriverList: PROCEDURE EXPOSE globals. shipped.
+    ARG driver_path
+
+    CALL VRSet VRWindow(), 'Pointer', 'WAIT'
+    CALL VRMethod 'CN_DEVICE_LIST', 'RemoveRecord', 'All'
+
+    IF VRGet('RB_DEVICE_SHIPPED', 'Set') == 1 THEN DO
+        CALL VRMethod 'CN_DEVICE_LIST', 'AddRecordList',,, 'shipped.'
+    END
+    ELSE DO
+        IF driver_path == '' THEN
+            driver_path = TRANSLATE( STRIP( VRGet('DDCB_DEVICE_3RDPARTY', 'Value')))
+        IF driver_path <> '' THEN DO
+            drivers.0 = 0
+            _total = 0
+            CALL SysFileTree driver_path'\*.DRV', 'drivers.', 'FO'
+            DO i = 1 TO drivers.0
+                list.0 = 0
+                IF SysGetEA( drivers.i, '.EXPAND', 'eaval') == 0 THEN DO
+                    PARSE VAR eaval 3 ealen 5 models
+                    offs = 1
+                    datalen = C2D( REVERSE( ealen ))
+                    DO WHILE offs <= datalen
+                        start = SUBSTR( models, offs )
+                        inc = POS('00'x, start )
+                        IF inc > 1 THEN DO
+                            current_name = STRIP( SUBSTR( start, 1, inc-1 ))
+                            _total = _total + 1
+                            list._total = ';'_desc';#2;;;NAME;'current_name';DRIVER;'|| TRANSLATE( drivers.i ) ||';'
+                        END
+                        offs = offs + inc
+                    END
+                END
+            END
+
+            list.0 = _total
+            CALL VRSortStem 'list.'
+            CALL VRMethod 'CN_DEVICE_LIST', 'AddRecordList',,, 'list.'
+            CALL VRSet 'DDCB_DEVICE_3RDPARTY', 'UserData', driver_path
+        END
+    END
+
+    CALL VRSet VRWindow(), 'Pointer', '<default>'
 
 RETURN
 
@@ -1944,7 +2185,7 @@ SW_ABOUT_Fini:
 return
 /*:VRX         SW_ABOUT_Init
 */
-SW_ABOUT_Init:
+SW_ABOUT_Init: PROCEDURE EXPOSE globals.
 
     IF globals.!is_ecs == 1 THEN
         _platform = 'eComStation'
@@ -1982,6 +2223,87 @@ SW_ABOUT_Init:
     end
     drop window
 return
+
+/*:VRX         SW_DEVICE_ADD_Close
+*/
+SW_DEVICE_ADD_Close:
+    call SW_DEVICE_ADD_Fini
+return
+
+/*:VRX         SW_DEVICE_ADD_Create
+*/
+SW_DEVICE_ADD_Create:
+    call SW_DEVICE_ADD_Init
+return
+
+/*:VRX         SW_DEVICE_ADD_Fini
+*/
+SW_DEVICE_ADD_Fini:
+    window = VRInfo( "Window" )
+    call VRDestroy window
+    drop window
+return
+/*:VRX         SW_DEVICE_ADD_Init
+*/
+SW_DEVICE_ADD_Init: PROCEDURE EXPOSE globals. shipped.
+
+    fld_name   = VRMethod('CN_DEVICE_LIST', 'AddField', 'String', NLSGetMessage( 265 ), 'NAME')
+    fld_driver = VRMethod('CN_DEVICE_LIST', 'AddField', 'String', NLSGetMessage( 266 ), 'DRIVER')
+
+    IF globals.!is_ecs == 1 THEN
+        _platform = 'eComStation'
+    ELSE
+        _platform = 'OS/2'
+    CALL NLSSetText 'SW_DEVICE_ADD',      'Caption', 260
+    CALL NLSSetText 'RB_DEVICE_SHIPPED',  'Caption', 261, _platform
+    CALL NLSSetText 'RB_DEVICE_3RDPARTY', 'Caption', 262, _platform
+    CALL NLSSetText 'PB_DEVICE_OTHER',    'Caption', 188
+    CALL NLSSetText 'PB_DEVICE_REFRESH',  'Caption', 63
+    CALL NLSSetText 'PB_DEVICE_INSTALL',  'Caption', 8
+    CALL NLSSetText 'PB_DEVICE_CANCEL',   'Caption', 3
+
+    window = VRInfo( "Object" )
+    CALL VRSet window, 'Pointer', 'WAIT'
+
+    extras_num = 0
+    PARSE UPPER VALUE VRGetIni('PrinterManager', 'LastDriverPath', 'USER') WITH last_path '00'x .
+    IF last_path <> '' THEN DO
+        extras_num = extras_num + 1
+        extras_path.extras_num = last_path
+    END
+    PARSE UPPER VALUE VRGetIni('PrinterManager', 'ThirdParty', 'USER') WITH known_3p '00'x .
+    IF known_3p == '' THEN known_3p = 'ECUPS ECUPS-HP GUTENPRT PSPRINT'
+    DO i = 1 TO WORDS( known_3p )
+        _basename = WORD( known_3p, i )
+        _ppdriver = _basename'.DRV'
+        _ppini = VRGetIni('PM_INSTALL', _basename'_DIR', 'USER')
+        IF _ppini == '' THEN ITERATE
+        PARSE VAR _ppini _pppath '00'x .
+        IF VRFileExists( _pppath'\'_ppdriver ) THEN DO
+            extras_num = extras_num + 1
+            extras_name.extras_num = _ppdriver
+            extras_path.extras_num = _pppath
+        END
+    END
+    extras_name.0 = extras_num
+    extras_path.0 = extras_num
+    CALL VRMethod 'DDCB_DEVICE_3RDPARTY', 'AddStringList', 'extras_path.'
+    IF extras_num > 0 THEN CALL VRSet 'DDCB_DEVICE_3RDPARTY', 'Selected', 1
+
+    if( \VRIsChildOf( window, "Notebook" ) ) then do
+        call VRMethod window, "CenterWindow"
+        call VRSet window, "Visible", 1
+        call VRMethod window, "Activate"
+    end
+
+    IF GetShippedDrivers() > 0 THEN DO
+/*        CALL VRMethod 'CN_DEVICE_LIST', 'AddRecordList',,, 'shipped.' */
+    END
+
+    CALL VRSet window, 'Pointer', '<default>'
+    drop window
+
+RETURN
 
 /*:VRX         SW_DEVICES_Close
 */
@@ -2267,8 +2589,9 @@ SW_PORTS_Init: PROCEDURE EXPOSE globals.
     ok = VRMethod( "CN_PORTS", "SetFieldAttr", globals.!hcfPorts.!icon, "HorizSeparator", "0" )
 
     CALL NLSSetText 'CN_PORTS',       'Caption', 105
-    CALL NLSSetText 'PB_PORT_ADD',    'Caption', 5
-    CALL NLSSetText 'PB_PORT_DELETE', 'Caption', 6
+    CALL NLSSetText 'PB_PORT_ADD',    'Caption', 8
+    CALL NLSSetText 'PB_PORT_DELETE', 'Caption', 9
+    CALL NLSSetText 'PB_PORT_EDIT',   'Caption', 10
 
     CALL RefreshPorts
 
@@ -2362,9 +2685,10 @@ return
 SW_PRINTERS_Init: PROCEDURE EXPOSE globals.
 
     CALL NLSSetText 'CN_PRINTERS',     'Caption', 103
-    CALL NLSSetText 'PB_PRINTER_ADD',  'Caption', 5
-    CALL NLSSetText 'PB_PRINTER_DEL',  'Caption', 6
+    CALL NLSSetText 'PB_PRINTER_ADD',  'Caption', 8
+    CALL NLSSetText 'PB_PRINTER_DEL',  'Caption', 9
     CALL NLSSetText 'PB_PRINTER_OPEN', 'Caption', 7
+    CALL NLSSetText 'PB_PRINTER_EDIT', 'Caption', 10
 
     globals.!hcfPrinters.!icon   = VRMethod( "CN_PRINTERS", "AddField", "Icon", "" )
     globals.!hcfPrinters.!title  = VRMethod( "CN_PRINTERS", "AddField", "String", NLSGetMessage( 110 ))
@@ -2430,8 +2754,10 @@ SW_WIZARD_Fini:
     IF globals.!wizard THEN CALL Quit
     ELSE DO
         call VRSet 'WN_MAIN', "Visible", 1
-        IF globals.!create_mode == '' THEN
+        IF globals.!create_mode == '' THEN DO
             call VRMethod 'WN_MAIN', "Activate"
+            CALL VRMethod 'TDL_MAIN', 'SetFocus'
+        END
     END
 RETURN
 /*:VRX         SW_WIZARD_Init
@@ -2494,14 +2820,6 @@ TDL_MAIN_PageSelected: PROCEDURE EXPOSE globals.
         END
     END
 
-RETURN
-
-/*:VRX         TM_REFRESH_Trigger
-*/
-TM_REFRESH_Trigger: PROCEDURE EXPOSE globals.
-    CALL RefreshPrinters
-    CALL RefreshPorts
-    CALL RefreshDevices
 RETURN
 
 /*:VRX         WN_MAIN_Close
