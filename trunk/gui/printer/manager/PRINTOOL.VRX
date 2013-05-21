@@ -887,7 +887,7 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.41'
+    globals.!version = '0.42'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -934,7 +934,7 @@ LoadSettings: PROCEDURE EXPOSE globals.
 
     /* Set the language file name.
      */
-    globals.!nlsname = 'printm_'
+    globals.!nlsname = 'printm'
 
     /* Determine the OS.
      */
@@ -2161,6 +2161,8 @@ SetLanguage: PROCEDURE EXPOSE globals.
     CALL NLSSetText 'MN_HELP',         'Caption', 80
     CALL NLSSetText 'MI_HELP_GENERAL', 'Caption', 81
     CALL NLSSetText 'MI_ABOUT',        'Caption', 89
+
+    CALL VRMethod 'WN_MAIN', 'InstallAccelerators'
 
 RETURN 1
 
