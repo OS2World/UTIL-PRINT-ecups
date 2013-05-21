@@ -109,7 +109,6 @@ LIMITATIONS & KNOWN PROBLEMS
     directory.
   - The CUPS printer is always created with default job options.  If you want
     to change them, you will have to do so from the CUPS administration GUI.
-  - There is no help.
   - There may well be undiscovered bugs; please report any you find.
 
 Contact: Alex Taylor (alex at altsan dot org)

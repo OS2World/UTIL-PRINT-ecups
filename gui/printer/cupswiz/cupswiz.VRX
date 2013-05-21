@@ -1354,6 +1354,12 @@ PB_CREATECANCEL_Click:
     CALL SW_CREATE_Close
 RETURN
 
+/*:VRX         PB_CREATEHELP_Click
+*/
+PB_CREATEHELP_Click: 
+    CALL VRMethod 'SW_CREATE', 'InvokeHelp'
+return
+
 /*:VRX         PB_CREATEOK_Click
 */
 PB_CREATEOK_Click:
@@ -1366,6 +1372,12 @@ PB_CREATEOK_Click:
     CALL SW_CREATE_Close
 
 RETURN
+
+/*:VRX         PB_HELP_Click
+*/
+PB_HELP_Click: 
+    CALL VRMethod 'WN_MAIN', 'InvokeHelp'
+return
 
 /*:VRX         PB_MODELCANCEL_Click
 */
@@ -1386,6 +1398,12 @@ RETURN
 PB_NETCANCEL_Click:
     CALL SW_NETWORK_Fini
 RETURN
+
+/*:VRX         PB_NETHELP_Click
+*/
+PB_NETHELP_Click: 
+    CALL VRMethod 'SW_NETWORK', 'InvokeHelp'
+return
 
 /*:VRX         PB_NETOK_Click
 */
@@ -1678,7 +1696,7 @@ SetLanguage: PROCEDURE EXPOSE globals.
     CALL NLSSetText 'WN_MAIN',    'Caption', 1         /* 1: Create CUPS Printer */
     CALL NLSSetText 'PB_NEXT',    'Caption', 5         /* 5: Next > */
     CALL NLSSetText 'PB_CANCEL',  'Caption', 3         /* 3: Cancel */
-    CALL NLSSetText 'PB_REFRESH', 'Caption', 6         /* 6: Refresh */
+    CALL NLSSetText 'PB_HELP',    'Caption', 4         /* 6: Help */
 
 RETURN 1
 
@@ -1721,6 +1739,8 @@ SetPage1: PROCEDURE EXPOSE globals. manufacturers.
 
     CALL VRSet 'PB_NEXT',  'Enabled', 0
     CALL VRSet 'LB_BRAND', 'Visible', 1
+
+    CALL VRSet 'WN_MAIN', 'HelpTag', 200
 
     /* Resize LB_SELECT if necessary to make room for LB_BRAND */
     lb_x = VRGet('LB_BRAND', 'Left') + VRGet('LB_BRAND', 'Width') + 60
@@ -1774,6 +1794,8 @@ RETURN
 SetPage2: PROCEDURE EXPOSE globals.
 
     globals.!page = 2
+    CALL VRSet 'WN_MAIN', 'HelpTag', 300
+
     CALL VRSet 'LB_BRAND', 'Visible', 0
     CALL VRSet 'PB_NEXT',  'Enabled', 0
     CALL NLSSetText 'WN_MAIN', 'StatusText', 29, globals.!prt_nick          /* 29: Selected printer:  %1 */
@@ -1803,6 +1825,8 @@ RETURN
 SetPage3: PROCEDURE EXPOSE globals.
 
     globals.!page = 3
+    CALL VRSet 'WN_MAIN', 'HelpTag', 400
+
     CALL VRSet 'EF_DESC', 'Value', globals.!prt_nick
     CALL NLSSetText DT_NAME,     'Caption', 103             /* 103: Name: */
     CALL NLSSetText DT_LOCATION, 'Caption', 105             /* 105: Location: */
@@ -1833,6 +1857,8 @@ RETURN
 SetPage4:
 
     globals.!page = 4
+    CALL VRSet 'WN_MAIN', 'HelpTag', 100
+
     CALL VRSet 'LB_SELECT', 'Visible',    0
     CALL VRSet 'GB_INFO',   'Visible',    0
     CALL VRSet 'WN_MAIN',   'StatusText', ''
@@ -1903,6 +1929,8 @@ return
 /*:VRX         SW_CREATE_Init
 */
 SW_CREATE_Init:
+
+    CALL VRSet 'SW_CREATE', 'HelpFile', VRGet('WN_MAIN', 'HelpFile')
 
     CALL NLSSetText 'SW_CREATE',  'Caption', 115                 /* 115: Confirm Create Printer */
     CALL NLSSetText 'DT_CRMODEL', 'Caption', 102                 /* 102: Model: */
@@ -2053,6 +2081,8 @@ return
 /*:VRX         SW_NETWORK_Init
 */
 SW_NETWORK_Init:
+
+    CALL VRSet 'SW_NETWORK', 'HelpFile', VRGet('WN_MAIN', 'HelpFile')
 
     /* Flag to keep track of whether dialog is open */
     network_dialog = 1
