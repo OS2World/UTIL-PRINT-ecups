@@ -151,7 +151,7 @@ CN_DEVICES_ContextMenu:  PROCEDURE EXPOSE globals.
         CALL VRMethod 'MN_DRIVERS', 'Popup'
     END
     ELSE
-        CALL VRMethod 'MN_VIEW', 'Popup'
+        CALL VRMethod 'MN_CONTEXT', 'Popup'
 
 RETURN
 
@@ -172,7 +172,7 @@ CN_PORTS_ContextMenu: PROCEDURE EXPOSE globals.
         CALL VRMethod 'MN_PORT', 'Popup'
     END
     ELSE DO
-        CALL VRMethod 'MN_VIEW', 'Popup'
+        CALL VRMethod 'MN_CONTEXT', 'Popup'
     END
 
 RETURN
@@ -213,7 +213,7 @@ CN_PRINTERS_ContextMenu: PROCEDURE EXPOSE globals.
         CALL VRMethod 'MN_PRINTER', 'Popup'
     END
     ELSE
-        CALL VRMethod 'MN_VIEW', 'Popup'
+        CALL VRMethod 'MN_CONTEXT', 'Popup'
 
 RETURN
 
@@ -887,7 +887,7 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.42'
+    globals.!version = '0.43'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -953,6 +953,45 @@ MI_ABOUT_Click:
     CALL VRLoadSecondary 'SW_ABOUT', 'W'
 RETURN
 
+/*:VRX         MI_CONTEXT_DETAIL_Click
+*/
+MI_CONTEXT_DETAIL_Click: PROCEDURE EXPOSE globals.
+    CALL MI_DETAILVIEW_Click
+RETURN
+
+/*:VRX         MI_CONTEXT_ICON_Click
+*/
+MI_CONTEXT_ICON_Click: PROCEDURE EXPOSE globals.
+    CALL MI_ICONVIEW_Click
+RETURN
+
+
+/*:VRX         MI_CONTEXT_INSTALL_Click
+*/
+MI_CONTEXT_INSTALL_Click: PROCEDURE EXPOSE globals.
+
+    _page = VRGet('TDL_MAIN', 'Selected')
+    _pagewin = VRMethod('TDL_MAIN', 'GetPageWindow', _page )
+    _cnr = VRGet( _pagewin, 'UserData')
+    IF _cnr == '' THEN RETURN
+
+    CALL VRSet _cnr, 'Source', 0
+
+    SELECT
+        WHEN _cnr == 'CN_PRINTERS' THEN CALL PrinterWizard
+        WHEN _cnr == 'CN_PORTS' THEN CALL PortAdd
+        WHEN _cnr == 'CN_DEVICES' THEN CALL DriverAdd
+        OTHERWISE NOP
+    END
+
+RETURN
+
+/*:VRX         MI_CONTEXT_REFRESH_Click
+*/
+MI_CONTEXT_REFRESH_Click: PROCEDURE EXPOSE globals.
+    CALL MI_REFRESH_Click
+RETURN
+
 /*:VRX         MI_DETAILVIEW_Click
 */
 MI_DETAILVIEW_Click: PROCEDURE EXPOSE globals.
@@ -969,8 +1008,10 @@ MI_DETAILVIEW_Click: PROCEDURE EXPOSE globals.
     CALL VRSet _cnr, 'View', 'Detail'
     CALL VRSet _cnr, 'MiniIcons', 1
 
-    CALL VRSet 'MI_ICONVIEW',   'Checked', 0
-    CALL VRSet 'MI_DETAILVIEW', 'Checked', 1
+    CALL VRSet 'MI_ICONVIEW',      'Checked', 0
+    CALL VRSet 'MI_CONTEXT_ICON',  'Checked', 0
+    CALL VRSet 'MI_DETAILVIEW',    'Checked', 1
+    CALL VRSet 'MI_CONTEXT_DETAIL','Checked', 1
 
 RETURN
 
@@ -1002,8 +1043,10 @@ MI_ICONVIEW_Click: PROCEDURE EXPOSE globals.
     CALL VRSet _cnr, 'View', 'Icon'
     CALL VRSet _cnr, 'MiniIcons', 0
 
-    CALL VRSet 'MI_ICONVIEW',   'Checked', 1
-    CALL VRSet 'MI_DETAILVIEW', 'Checked', 0
+    CALL VRSet 'MI_ICONVIEW',       'Checked', 1
+    CALL VRSet 'MI_CONTEXT_ICON',   'Checked', 1
+    CALL VRSet 'MI_DETAILVIEW',     'Checked', 0
+    CALL VRSet 'MI_CONTEXT_DETAIL', 'Checked', 0
 
 RETURN
 
@@ -2154,6 +2197,11 @@ SetLanguage: PROCEDURE EXPOSE globals.
     CALL NLSSetText 'MI_ICONVIEW',   'Caption', 62
     CALL NLSSetText 'MI_REFRESH',    'Caption', 63
 
+    CALL NLSSetText 'MI_CONTEXT_INSTALL', 'Caption', 8
+    CALL NLSSetText 'MI_CONTEXT_DETAIL',  'Caption', 61
+    CALL NLSSetText 'MI_CONTEXT_ICON',    'Caption', 62
+    CALL NLSSetText 'MI_CONTEXT_REFRESH', 'Caption', 63
+
     CALL NLSSetText 'MN_PRINTERPAK',  'Caption', 70
     CALL NLSSetText 'MI_PPAK_MODELS', 'Caption', 71
     CALL NLSSetText 'MI_PPAK_COPY',   'Caption', 72
@@ -2805,12 +2853,16 @@ TDL_MAIN_PageSelected: PROCEDURE EXPOSE globals.
     IF _view == 'Detail' THEN DO
         CALL VRSet 'MI_ICONVIEW',   'Checked', 0
         CALL VRSet 'MI_DETAILVIEW', 'Checked', 1
+        CALL VRSet 'MI_CONTEXT_ICON',   'Checked', 0
+        CALL VRSet 'MI_CONTEXT_DETAIL', 'Checked', 1
     END
     ELSE DO
         CALL VRSet 'MI_ICONVIEW',   'Checked', 1
         CALL VRSet 'MI_DETAILVIEW', 'Checked', 0
+        CALL VRSet 'MI_CONTEXT_ICON',   'Checked', 1
+        CALL VRSet 'MI_CONTEXT_DETAIL', 'Checked', 0
     END
-
+/*
     SELECT
         WHEN _cnr == 'CN_PRINTERS' THEN DO
         END
@@ -2821,7 +2873,7 @@ TDL_MAIN_PageSelected: PROCEDURE EXPOSE globals.
         OTHERWISE DO
         END
     END
-
+*/
 RETURN
 
 /*:VRX         WN_MAIN_Close

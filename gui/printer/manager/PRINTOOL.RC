@@ -8,4 +8,4 @@ ICON 6  PRELOAD port_network.ico
 ICON 7  PRELOAD port_usb.ico
 ICON 10  PRELOAD port_cups.ico
 */
-ICON 20  PRELOAD create.ico
+ICON 20  PRELOAD newprint.ico
