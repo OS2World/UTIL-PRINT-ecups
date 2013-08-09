@@ -887,7 +887,7 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.43'
+    globals.!version = '0.44'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -1556,7 +1556,7 @@ PB_PPUPDATE_Click: PROCEDURE EXPOSE globals.
                 CALL VRSetIni 'PrinterManager', 'ThirdParty', known_3p || '00'x, 'USER'
             END
             IF drv_target == '' THEN DO
-                drv_target = globals.!repository'\'drv_target
+                drv_target = globals.!repository'\'drv_stem
                 _btns.1 = NLSGetMessage( 2 )
                 _btns.2 = NLSGetMessage( 3 )
                 _btns.3 = NLSGetMessage( 188 )
@@ -1620,6 +1620,8 @@ PB_PPUPDATE_Click: PROCEDURE EXPOSE globals.
         END
     END
 
+    /* Refresh the list */
+    CALL GetPrinterPaks
 RETURN 0
 
 /*:VRX         PB_PRINTER_ADD_Click
