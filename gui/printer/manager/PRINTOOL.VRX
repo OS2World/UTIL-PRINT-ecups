@@ -1887,17 +1887,22 @@ PrinterSetDefault: PROCEDURE EXPOSE globals.
     END
     _queue = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!queue )
     ok = RPUQueueDefault( _queue )
-/*
-    IF ok == 1 THEN DO
-        CALL VRSet 'MI_PRINTER_DEFAULT', 'Checked', 1
-        _flags = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!flags )
-        IF POS( _flags, 'D') == 0 THEN DO
-            _flags = 'D'_flags
-            CALL VRMethod 'CN_PRINTERS', 'SetFieldData', record, globals.!hcfPrinters.!flags, _flags
-        END
-    END
-*/
+
+/*** Would also need to remove 'D' flag from previous default printer.  Simpler
+ *** just to call RefreshPrinters (below) instead.
+ *
+ *  IF ok == 1 THEN DO
+ *      CALL VRSet 'MI_PRINTER_DEFAULT', 'Checked', 1
+ *      _flags = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!flags )
+ *      IF POS( _flags, 'D') == 0 THEN DO
+ *          _flags = 'D'_flags
+ *          CALL VRMethod 'CN_PRINTERS', 'SetFieldData', record, globals.!hcfPrinters.!flags, _flags
+ *      END
+ *  END
+ */
+
     CALL VRMethod 'CN_PRINTERS', 'SetRecordAttr', record, 'Source', 0
+    CALL RefreshPrinters
 RETURN ok
 
 /*:VRX         PrinterWizard

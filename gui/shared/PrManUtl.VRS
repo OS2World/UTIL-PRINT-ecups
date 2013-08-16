@@ -233,7 +233,9 @@ CopyPrinterPak: PROCEDURE EXPOSE globals.
     PARSE ARG driver, newdrvdir
 
     drv_dir = VRParseFilePath( driver, 'DP')
+    drv_name = VRParseFilePath( driver, 'NE')
     IF drv_dir == '' THEN RETURN 0
+
 
     IF VerifyDriverEAs( driver ) == 0 THEN RETURN 0
 
@@ -269,6 +271,10 @@ CopyPrinterPak: PROCEDURE EXPOSE globals.
         DROP copyfile
         DROP filelist
     END
+
+    eafile = VRParseFilePath( driver, 'N') || '.EA'
+    IF \VRFileExists( newdrvdir'\'eafile ) THEN
+        ADDRESS CMD '@EAUTIL' newdrvdir'\'drv_name ea_file '/s /p 2>NUL 1>NUL'
 
 RETURN 1
 
