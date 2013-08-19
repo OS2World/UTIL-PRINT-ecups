@@ -236,7 +236,6 @@ CopyPrinterPak: PROCEDURE EXPOSE globals.
     drv_name = VRParseFilePath( driver, 'NE')
     IF drv_dir == '' THEN RETURN 0
 
-
     IF VerifyDriverEAs( driver ) == 0 THEN RETURN 0
 
     CALL LINEOUT globals.!log1, 'Copying driver files from' drv_dir 'to' newdrvdir'...'
@@ -272,9 +271,18 @@ CopyPrinterPak: PROCEDURE EXPOSE globals.
         DROP filelist
     END
 
+    /* If AUXPRINT.PAK exists, copy it as well */
+    copyfile = drv_dir'\AUXPRINT.PAK'
+    IF STREAM( copyfile, 'C', 'QUERY EXISTS') <> '' THEN DO
+        ok = VRCopyFile( copyfile, newdrvdir'\AUXPRINT.PAK'
+        CALL LINEOUT globals.!log1, ' -' copyfile ':' ok
+    END
+
+    /* Create an EA file if necessary */
     eafile = VRParseFilePath( driver, 'N') || '.EA'
-    IF \VRFileExists( newdrvdir'\'eafile ) THEN
-        ADDRESS CMD '@EAUTIL' newdrvdir'\'drv_name ea_file '/s /p 2>NUL 1>NUL'
+    IF VRFileExists( newdrvdir'\'eafile ) THEN
+        CALL VRDeleteFile newdrvdir'\'eafile
+    ADDRESS CMD '@EAUTIL' newdrvdir'\'drv_name newdrvdir'\'eafile '/s /p 2>NUL 1>NUL'
 
 RETURN 1
 
