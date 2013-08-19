@@ -466,6 +466,8 @@ GetPrinterPaks: PROCEDURE EXPOSE globals.
     END
 
     ppaks.0 = _count
+
+    CALL VRMethod 'CN_PRINTERPAKS', 'RemoveRecord', 'All'
     CALL VRMethod 'CN_PRINTERPAKS', 'AddRecordList',, 'Last', 'ppaks.'
 
     CALL VRSet 'WN_MAIN', 'Pointer', '<default>'
@@ -887,7 +889,7 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.44'
+    globals.!version = '0.45'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -2316,7 +2318,7 @@ SW_DEVICE_ADD_Init: PROCEDURE EXPOSE globals. shipped.
     CALL NLSSetText 'RB_DEVICE_3RDPARTY', 'Caption', 262, _platform
     CALL NLSSetText 'PB_DEVICE_OTHER',    'Caption', 188
     CALL NLSSetText 'PB_DEVICE_REFRESH',  'Caption', 63
-    CALL NLSSetText 'PB_DEVICE_INSTALL',  'Caption', 8
+    CALL NLSSetText 'PB_DEVICE_INSTALL',  'Caption', 2
     CALL NLSSetText 'PB_DEVICE_CANCEL',   'Caption', 3
 
     window = VRInfo( "Object" )
