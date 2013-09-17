@@ -118,7 +118,7 @@ CheckPrograms: PROCEDURE EXPOSE globals.
         cups_pdr = VRGetIni('PM_PORT_DRIVER', 'CUPS', 'System')
         IF cups_pdr == '' THEN DO
             cups_pdr = STREAM( globals.!bootdrv'\OS2\DLL\CUPS.PDR', 'C', 'QUERY EXISTS')
-            IF cups_pdr <> '' THEN CALL VRSetIni('PM_PORT_DRIVER', 'CUPS', cups_pdr, 'System')
+            IF cups_pdr <> '' THEN CALL VRSetIni 'PM_PORT_DRIVER', 'CUPS', cups_pdr, 'System'
         END
         IF cups_pdr <> '' THEN
             globals.!hascups = 1
@@ -157,7 +157,7 @@ RETURN
 
 /*:VRX         CN_DEVICES_KeyPress
 */
-CN_DEVICES_KeyPress: 
+CN_DEVICES_KeyPress:
     IF VRGet('CN_DEVICES', 'KeyString') == '{Backtab}' THEN
         CALL VRMethod 'TDL_MAIN', 'SetFocus'
 return
@@ -179,7 +179,7 @@ RETURN
 
 /*:VRX         CN_PORTS_KeyPress
 */
-CN_PORTS_KeyPress: 
+CN_PORTS_KeyPress:
     IF VRGet('CN_PORTS', 'KeyString') == '{Backtab}' THEN
         CALL VRMethod 'TDL_MAIN', 'SetFocus'
 return
@@ -225,7 +225,7 @@ RETURN
 
 /*:VRX         CN_PRINTERS_KeyPress
 */
-CN_PRINTERS_KeyPress: 
+CN_PRINTERS_KeyPress:
     IF VRGet('CN_PRINTERS', 'KeyString') == '{Backtab}' THEN
         CALL VRMethod 'TDL_MAIN', 'SetFocus'
 RETURN
@@ -1364,7 +1364,7 @@ RETURN
 
 /*:VRX         PB_DEVICE_REMOVE_KeyPress
 */
-PB_DEVICE_REMOVE_KeyPress: 
+PB_DEVICE_REMOVE_KeyPress:
     IF VRGet('PB_DEVICE_REMOVE', 'KeyString') == '{Tab}' THEN
         CALL VRMethod 'TDL_MAIN', 'SetFocus'
 return
@@ -1478,13 +1478,13 @@ return
 
 /*:VRX         PB_PORT_EDIT_Click
 */
-PB_PORT_EDIT_Click: 
+PB_PORT_EDIT_Click:
     CALL PortProperties
 return
 
 /*:VRX         PB_PORT_EDIT_KeyPress
 */
-PB_PORT_EDIT_KeyPress: 
+PB_PORT_EDIT_KeyPress:
     IF VRGet('PB_PORT_EDIT', 'KeyString') == '{Tab}' THEN
         CALL VRMethod 'TDL_MAIN', 'SetFocus'
 return
@@ -1640,13 +1640,13 @@ return
 
 /*:VRX         PB_PRINTER_EDIT_Click
 */
-PB_PRINTER_EDIT_Click: 
+PB_PRINTER_EDIT_Click:
     CALL PrinterProperties
 RETURN
 
 /*:VRX         PB_PRINTER_EDIT_KeyPress
 */
-PB_PRINTER_EDIT_KeyPress: 
+PB_PRINTER_EDIT_KeyPress:
     IF VRGet('PB_PRINTER_EDIT', 'KeyString') == '{Tab}' THEN
         CALL VRMethod 'TDL_MAIN', 'SetFocus'
 return
@@ -1772,6 +1772,7 @@ PrinterDelete: PROCEDURE EXPOSE globals.
 
     success = 0
     _title = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!title )
+    _device= VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!name )
     _queue = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!queue )
     _port  = VRMethod('CN_PRINTERS', 'GetFieldData', record, globals.!hcfPrinters.!port )
 
@@ -1780,7 +1781,10 @@ PrinterDelete: PROCEDURE EXPOSE globals.
     _btns.2 = NLSGetMessage( 15 )
     _confirm = VRMessage('WN_MAIN', NLSGetMessage( 201, _title ), NLSGetMessage( 200 ), 'Q', '_btns.', 2, 2 )
     IF _confirm == 1 THEN DO
-        success = RPUPrinterDelete( _queue )
+        IF _queue == '' THEN 
+            success = RPUDeviceDelete( _device )
+        ELSE
+            success = RPUPrinterDelete( _queue )
         CALL RPUPortInfo _port, 'port.'
         IF port.!driver == 'CUPS' THEN DO
             /* If this corresponds to a locally-defined CUPS queue, offer to
