@@ -1,5 +1,5 @@
 PM Printer Manager
-Version 0.44
+Version 0.45
 
   Printer Manager is a new graphical printer management tool designed to 
   replace several older, separate programs by integrating their functions
