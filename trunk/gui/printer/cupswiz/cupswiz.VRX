@@ -285,7 +285,7 @@ RETURN rc
 /*:VRX         CreateOS2Printer
 */
 /* Creates an OS/2 printer port, queue, and desktop object which point to
- * the just-created CUPS printer.  Uses the RINSTPRN utility from IBM.
+ * the just-created CUPS printer.
  */
 CreateOS2Printer: PROCEDURE EXPOSE globals.
     ARG prnt_drv
@@ -340,13 +340,13 @@ CreateOS2Printer: PROCEDURE EXPOSE globals.
     IF ok == 0 THEN DO
         ok = CreatePrinterObject( prnt_drv, printer_model,,
                                   port_name, queue_name, printer_title )
-        CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv',' printer_model,
+        CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv',' printer_model ||,
                                     ',' port_name',' queue_name',' printer_title ') RC =' ok
-        IF ok <> 0 THEN DO
+        IF ( ok <> 0 ) & ( printer_model <> 'Generic Postscript Printer') THEN DO
             CALL LINEOUT globals.!log1, 'Failed to create printer object; trying again with generic driver.'
             ok = CreatePrinterObject( prnt_drv, 'Generic Postscript Printer',,
                                       port_name, queue_name, printer_title )
-            CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv', Generic Postscript Printer',
+            CALL LINEOUT globals.!log1, 'CreatePrinterObject(' prnt_drv', Generic Postscript Printer' ||,
                                         ',' port_name',' queue_name',' printer_title ') RC =' ok
         END
     END
@@ -411,21 +411,30 @@ CreatePrinter: PROCEDURE EXPOSE globals.
                     RETURN 1                /* RC=1  PPD import failed **/
             END
         END
-        ELSE IF PrinterExistsInDRV( globals.!os2driver, globals.!prt_nick ) == 0 THEN DO
-            cups_ppd = globals.!prt_ppd
-            IF cups_ppd == '' THEN
-                cups_ppd = STREAM( globals.!cupsdir'\etc\cups\ppd\'globals.!prt_name'.ppd', 'C', 'QUERY EXISTS')
-            IF cups_ppd == '' THEN
-                CALL PromptForPMName
-            ELSE DO
-                ok = ImportPPD(globals.!os2driver, cups_ppd )
-                IF ok <> 0 THEN DO
-                    CALL LINEOUT globals.!log1, 'PPD import failed:' ok
-                    CALL VRMessage VRWindow(), NLSGetMessage( 69 ),  NLSGetMessage( 70 ), 'W'
+        ELSE DO
+            drv_model = PrinterExistsInDRV( globals.!os2driver, globals.!prt_nick )
+            IF drv_model == '' THEN DO
+                cups_ppd = globals.!prt_ppd
+                IF cups_ppd == '' THEN
+                    cups_ppd = STREAM( globals.!cupsdir'\etc\cups\ppd\'globals.!prt_name'.ppd', 'C', 'QUERY EXISTS')
+                IF cups_ppd == '' THEN DO
+                    CALL LINEOUT globals.!log1, 'CUPS PPD for this printer ('globals.!cupsdir'\etc\cups\ppd\'globals.!prt_name'.ppd) does not exist.'
+                    CALL LINEOUT globals.!log1, 'Cannot import PPD.  Prompting user for preferred printer model.'
                     CALL PromptForPMName
-                    /* RETURN 1                RC=1  PPD import failed **/
+                END
+                ELSE DO
+                    ok = ImportPPD(globals.!os2driver, cups_ppd )
+                    IF ok <> 0 THEN DO
+                        CALL LINEOUT globals.!log1, 'PPD import failed:' ok
+                        CALL VRMessage VRWindow(), NLSGetMessage( 69 ),  NLSGetMessage( 70 ), 'W'
+                        CALL PromptForPMName
+                        /* RETURN 1                RC=1  PPD import failed **/
+                    END
                 END
             END
+            ELSE
+                /* Make sure the name matches, including case */
+                globals.!prt_nick = drv_model
         END
 
         ok = CreateOS2Printer( globals.!os2driver )
@@ -1120,7 +1129,7 @@ Init:
 
     _force_remote = 0
     globals.!prt_ppd = ''
-    IF InitArgs.0 > 0 THEN 
+    IF InitArgs.0 > 0 THEN
     DO i = 1 TO InitArgs.0
         InitArgs.i = TRANSLATE( InitArgs.i )
         IF VRIsDir( InitArgs.i ) THEN
@@ -1356,7 +1365,7 @@ RETURN
 
 /*:VRX         PB_CREATEHELP_Click
 */
-PB_CREATEHELP_Click: 
+PB_CREATEHELP_Click:
     CALL VRMethod 'SW_CREATE', 'InvokeHelp'
 return
 
@@ -1375,7 +1384,7 @@ RETURN
 
 /*:VRX         PB_HELP_Click
 */
-PB_HELP_Click: 
+PB_HELP_Click:
     CALL VRMethod 'WN_MAIN', 'InvokeHelp'
 return
 
@@ -1401,7 +1410,7 @@ RETURN
 
 /*:VRX         PB_NETHELP_Click
 */
-PB_NETHELP_Click: 
+PB_NETHELP_Click:
     CALL VRMethod 'SW_NETWORK', 'InvokeHelp'
 return
 
@@ -1890,7 +1899,7 @@ SW_ABOUT_Init:
 
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
-    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.04'                                  /* 12: Version %1 */
+    CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.05'                                  /* 12: Version %1 */
     CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 

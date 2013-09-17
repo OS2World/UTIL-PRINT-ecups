@@ -176,6 +176,10 @@ RETURN 1
 */
 /* Determine if the specified PrinterPak driver already contains support
  * for the specified printer model.
+ *
+ * If so, return the name of the model as found in the driver (necessary in
+ * order to make sure the correct case is retained, which may be different
+ * from what was requested).  Otherwise return ''.
  */
 PrinterExistsInDRV: PROCEDURE EXPOSE globals.
     PARSE UPPER ARG driver_name, printer_name
@@ -196,13 +200,13 @@ PrinterExistsInDRV: PROCEDURE EXPOSE globals.
      * PPD files).  Next we check each one against our requested printer name.
      */
     start = 1
-    found = 0
+    found = ''
     DO WHILE ( found == 0 ) & ( start < total_len )
         _strend = POS('0'x, exist_models, start )
         IF _strend == 0 THEN LEAVE
-        _model = TRANSLATE( SUBSTR( exist_models, start, _strend - start ))
-        IF _model == printer_name THEN
-            found = 1
+        _model = SUBSTR( exist_models, start, _strend - start )
+        IF TRANSLATE( _model ) == printer_name THEN
+            found = _model
         ELSE
             start = _strend + 1
     END
