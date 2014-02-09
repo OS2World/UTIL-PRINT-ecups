@@ -173,7 +173,10 @@ itself uses IPP when sharing its printers out over the network, so you would
 normally select this option when connecting to a remote CUPS server.
 :dl break=fit tsize=30.
 :dt.Printer or server address
-:dd.Enter the IP address or hostname of the remote server.
+:dd.Enter the IP address or hostname of the remote server. By default, CUPS
+expects to the server at this address to communicate on port 631; you can
+specify a different port by appending a colon to this address followed by
+the port number.
 :dt.Printer queue name
 :dd.Enter the name of the printer device on the server.  The required format
 may vary depending on the particular print server; for a remote CUPS server,
