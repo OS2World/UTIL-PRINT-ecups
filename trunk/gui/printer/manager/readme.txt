@@ -1,5 +1,5 @@
 PM Printer Manager
-Version 0.45
+Version 0.46
 
   Printer Manager is a new graphical printer management tool designed to 
   replace several older, separate programs by integrating their functions
@@ -46,7 +46,7 @@ LICENSE
   Source code is available via NetLabs SVN at:  http://svn.netlabs.org/ecups
 
   PM Printer Manager
-  (C) 2013 Alexander Taylor
+  (C) 2013-2014 Alexander Taylor
  
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -70,4 +70,4 @@ LICENSE
 
 -- 
 Alex Taylor
-August 2013
+May 2014

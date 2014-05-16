@@ -787,7 +787,7 @@ ImportPPD: PROCEDURE EXPOSE globals.
          * installation doesn't/fails to copy them, which can happen under
          * some circumstances.)
          */
-        IF VRFileExists( globals.!os2dir'\DLL\'driver'.DRV') THEN DO
+        IF VRFileExists( globals.!os2dir'\DLL\'driver'\'driver'.DRV') THEN DO
             CALL VRCopyFile workdir'\OUT\AUXPRINT.PAK',,
                             globals.!os2dir'\DLL\'driver'\AUXPRINT.PAK'
             CALL PRReplaceModule globals.!os2dir'\DLL\'driver'\'driver'.DRV', '', ''
@@ -889,7 +889,7 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.45'
+    globals.!version = '0.46'
     globals.!copyright = '2013'
 
     me = VRGet('Application', 'Program')
@@ -1781,7 +1781,7 @@ PrinterDelete: PROCEDURE EXPOSE globals.
     _btns.2 = NLSGetMessage( 15 )
     _confirm = VRMessage('WN_MAIN', NLSGetMessage( 201, _title ), NLSGetMessage( 200 ), 'Q', '_btns.', 2, 2 )
     IF _confirm == 1 THEN DO
-        IF _queue == '' THEN 
+        IF _queue == '' THEN
             success = RPUDeviceDelete( _device )
         ELSE
             success = RPUPrinterDelete( _queue )
