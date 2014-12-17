@@ -1,9 +1,9 @@
 PM Printer Manager
-Version 0.46
+Version 0.50
 
   Printer Manager is a new graphical printer management tool designed to 
   replace several older, separate programs by integrating their functions
-  in one, centralize utility:
+  in one, centralized utility:
     - INSTPDR.EXE (done)
     - ECSPRINT.EXE (done)
     - CUPSWIZ.EXE (not yet implemented)
@@ -15,7 +15,8 @@ INSTALLATION
    - VROBJ.DLL (widely available, included with eCS)
    - WPTOOLS.DLL (widely available, included with eCS)
    - PR1UTIL.DLL (widely available, included with eCS 2.x)
-   - VROBJEX.DLL (included here, to be included in eCS 2.2)
+   - VROBJEX.DLL (available from http://trac.netlabs.org/vxapps, 
+                  included in eCS 2.2)
    - RXPRTUTL.DLL (included here)
 
   This program also uses a number of CUPS tools if CUPS is installed.  It
@@ -70,4 +71,4 @@ LICENSE
 
 -- 
 Alex Taylor
-May 2014
+December 2014

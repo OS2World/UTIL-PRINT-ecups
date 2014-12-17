@@ -506,7 +506,7 @@ return
  * complicated, all the more so because we need to deal with a large number of
  * possible situations.
  */
-ImportPPD: PROCEDURE EXPOSE globals.
+ImportPPD: PROCEDURE EXPOSE globals. driver_path
     ARG driver, ppdfile
     IF driver == '' THEN driver = 'PSCRIPT'
 
@@ -521,8 +521,8 @@ ImportPPD: PROCEDURE EXPOSE globals.
          */
         WHEN status == 1 THEN NOP
 
-        /* An installable (working) copy of the driver could not be located, but
-         * we found an installed (in use) version whence we can grab the files.
+        /* An installable (distribution) copy of the driver could not be located,
+         * but we found an installed (in use) version whence we can grab the files.
          */
         WHEN status == 2 THEN DO
             /* We need somewhere for the installable copies to live.  We ask
@@ -587,7 +587,7 @@ ImportPPD: PROCEDURE EXPOSE globals.
      *    the newly-defined printer to PRDESC.LST.
      */
 
-    /** TODO should move all below this into a new shared function **/
+/**** Moved all below this into a shared function
 
     CALL LINEOUT globals.!log1, 'Driver source:          ' driver_path
 
@@ -781,11 +781,12 @@ ImportPPD: PROCEDURE EXPOSE globals.
     ok = VRCopyFile( workdir'\OUT\'driver'.DRV', target'\'driver'.DRV')
     IF ok == 1 THEN
         ok = VRCopyFile( workdir'\OUT\AUXPRINT.PAK', target'\AUXPRINT.PAK')
+
     IF ok == 1 THEN DO
         /* Copy the updated files to \OS2\DLL\<driver>, replacing any
          * existing copies.  (This prevents problems if the OS/2 driver
-         * installation doesn't/fails to copy them, which can happen under
-         * some circumstances.)
+         * installation fails to copy them, which can happen under some
+         * circumstances.)
          */
         IF VRFileExists( globals.!os2dir'\DLL\'driver'\'driver'.DRV') THEN DO
             CALL VRCopyFile workdir'\OUT\AUXPRINT.PAK',,
@@ -813,7 +814,11 @@ ImportPPD: PROCEDURE EXPOSE globals.
     CALL VRRmDir( workdir'\OUT')
     CALL VRRmDir( workdir )
 
-RETURN 0
+****/
+
+    ok = PinWrapper( 1, driver, ppdfile )
+
+RETURN ok
 
 /*:VRX         Init
 */
@@ -889,8 +894,8 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.46'
-    globals.!copyright = '2013'
+    globals.!version = '0.50'
+    globals.!copyright = '2013-2014'
 
     me = VRGet('Application', 'Program')
     IF me == '' THEN PARSE SOURCE . . me
@@ -1193,7 +1198,7 @@ New_CUPS: PROCEDURE EXPOSE globals.
         IF _workdir == '' THEN _workdir = VRParseFilePath( cupswiz, 'DP')
     END
     ELSE DO
-        cupswiz = Stream( globals.!cupsdir'\cups\cupswiz.exe', 'C', 'QUERY EXISTS')
+        cupswiz = Stream( globals.!cupsdir'\cupswiz.exe', 'C', 'QUERY EXISTS')
         _workdir = VRParseFilePath( cupswiz, 'DP')
         _parms = ''
     END
@@ -1202,10 +1207,15 @@ New_CUPS: PROCEDURE EXPOSE globals.
         CALL DIRECTORY _workdir
         IF ppd_file <> '' & VRFileExists( ppd_file ) THEN
             _parms = _parms ppd_file
+        CALL LINEOUT globals.!log1, 'Launching CUPS wizard with: start' cupswiz _parms
         ADDRESS CMD 'start' cupswiz _parms
         CALL DIRECTORY od
         CALL Quit
     END
+    ELSE DO
+        CALL LINEOUT globals.!log1, 'Failed to locate CUPS wizard.'
+    END
+
 
 RETURN
 
@@ -1386,7 +1396,7 @@ PB_IMPORTOK_Click: PROCEDURE EXPOSE globals. new_ppd
         RETURN
     END
     driver = VRGet('DDCB_IMPORTDRV', 'Value')
-    ok = ImportPPD( driver, new_ppd )
+    ok = ImportPPD( driver, new_ppd )           /* Also sets driver_path variable */
 
     SELECT
         /* Check the return code from ImportPPD and display an appropriate message.
@@ -1438,6 +1448,24 @@ PB_IMPORTOK_Click: PROCEDURE EXPOSE globals. new_ppd
 
     IF message <> '' THEN
         CALL VRMessage VRWindow(), _message, _mbtitle, _mbicon
+
+    IF ok == 0 THEN DO
+        /* The PPD was imported into the driver install directory. Now we should
+         * ask the user if they want to actually install this printer driver so
+         * that existing printer objects can use it.
+         */
+        _new_model = GetNameFromPPD( new_ppd )
+        _btns.0 = 2
+        _btns.1 = NLSGetMessage( 14 )
+        _btns.2 = NLSGetMessage( 15 )
+        _create = VRMessage( VRWindow(), NLSGetMessage( 240, _new_model ) || '0d0d0a'x ||,
+                             NLSGetMessage( 241 ), NLSGetMessage( 239 ), 'Q', '_btns.', 1, 2 )
+        IF _create == 1 THEN DO
+            _ipd = InstallPrintDriver( driver, driver_path, _new_model )
+            IF _ipd <> 0 THEN
+                CALL VRMessage VRWindow(), NLSGetMessage( 168, driver'.'_new_model ), NLSGetMessage( 13 ), 'E'
+        END
+    END
 
     CALL SW_IMPORT_Close
 RETURN
@@ -1587,8 +1615,33 @@ PB_PPUPDATE_Click: PROCEDURE EXPOSE globals.
                 ok = VRMkDir( drv_target )
 
             ok = CopyPrinterPak( new_drv, drv_target )
+
+            /* Update any previously-imported PPDs for this driver
+             */
+            IF ok == 1 THEN DO
+/* TODO use drv_target and parse it for pmdx directly */
+                driver_path = GetDriverSource( drv_stem )      /* Also sets pmdx */
+                IF pmdx == '' THEN
+                    driver_repo = 0
+                ELSE
+                    driver_repo = 1
+                pwok = PinWrapper( 0, drv_stem, '')
+                IF pwok <> 0 THEN DO
+                    CALL CHAROUT globals.!log1, 'Encountered error' pwok 'from PIN wrapper:'
+                    SELECT
+                        WHEN ok == 3 THEN CALL LINEOUT globals.!log1, 'Invalid path specified'
+                        WHEN ok == 4 THEN CALL LINEOUT globals.!log1, 'Failed to copy driver files'
+                        WHEN ok == 5 THEN CALL LINEOUT globals.!log1, 'Failed to create directory'
+                        WHEN ok == 6 THEN CALL LINEOUT globals.!log1, 'PPD import failed'
+                        WHEN ok == 7 THEN CALL LINEOUT globals.!log1, 'Error updating PRDESC.LST'
+                        OTHERWISE CALL LINEOUT globals.!log1, 'Unknown error'
+                    END
+                    ok = 0
+                END
+            END
+
             IF existing & ok == 1 THEN DO
-                CALL UpdatePrDesc new_drv, drv_target'\'new_drv
+                CALL UpdatePrDesc drv_name, drv_target'\'drv_name
             END
             IF ok == 0 THEN DO
                 CALL VRMessage VRWindow(), NLSGetMessage( 220 ), NLSGetMessage( 13 ), 'E'
@@ -1596,6 +1649,8 @@ PB_PPUPDATE_Click: PROCEDURE EXPOSE globals.
             END
             ELSE
                 CALL VRMessage VRWindow(), NLSGetMessage( 193 ), NLSGetMessage( 16 ), 'I'
+
+            new_drv = drv_target'\'drv_name
         END
     END
 

@@ -102,10 +102,10 @@
 #include <string.h>
 #include <ctype.h>
 #ifndef __KLIBC__
- 	#include <builtin.h>
+#include <builtin.h>
 #else
-	typedef INT      *PINT;
-	#define strcmpi strcmp
+typedef INT      *PINT;
+#define strcmpi strcmp
 #endif
 
 //#include <genplib.h>
@@ -808,7 +808,7 @@ void TrimString ( PSZ str )
 {
         if( str == NULL || *str == 0 ) return;
 
-	while( (*str) !=0 ) str++;  // find the end of the string
+    while( (*str) !=0 ) str++;  // find the end of the string
         str--; // get to last character (step over 0)
         while( isblank(*str) ) str--; // see if the character is blank, keep backstepping
         str++; // step over non-blank, get to last blank
@@ -1216,7 +1216,11 @@ BOOL FormPpd(void)
   // beef up resolution
   if (desPpd.desItems.iResDpi == 0)
   {
+#if 0
     desPpd.desItems.iResDpi = 300;
+#else
+    desPpd.desItems.iResDpi = 1440;  // workaround for WordPro printing problem
+#endif
   }
 
   /*
@@ -1380,10 +1384,10 @@ BOOL FormPpd(void)
          px  = strstr(pbPrBuffer,"points") + strlen("points");
          i = SkipBlank(px);
          px += i;
-         desPpd.desPage.iCustomPageSizeMinHeight = atoi(px);
+         desPpd.desPage.iCustomPageSizeMinHeight = (SHORT)atoi(px); // ALT
          i = MovePast( px, ' ' );
          px += i;
-         desPpd.desPage.iCustomPageSizeMaxHeight = atoi(px);
+         desPpd.desPage.iCustomPageSizeMaxHeight = (SHORT)atoi(px); // ALT
        }
      }
      if(desPpd.desPage.iCustomPageSizeMinWidth  != NOT_SELECTED &&
@@ -2361,15 +2365,15 @@ UINT ProcessUIBlock( PUI_LIST pUIList, PUI_BLOCK pUIBlock, UINT uiStrLen, PUSHOR
 
       if(stricmp(pCompare,"Resolution")==0)
       {
-      	ULONG uiResStr;
-      	// we are in resolution processing
-      	uiResStr = uiStrLen + MovePast( pbPrBuffer + uiStrLen, ':' );
-      	uiResStr += SkipBlank( pbPrBuffer + uiResStr );
-      	if(strnicmp(pbPrBuffer+uiResStr,"\"\"",2)==0)
-      	{
-      		// we found a empty resolution string so skip this one
-      		bSkipEntry = TRUE;
-      	}	
+        ULONG uiResStr;
+        // we are in resolution processing
+        uiResStr = uiStrLen + MovePast( pbPrBuffer + uiStrLen, ':' );
+        uiResStr += SkipBlank( pbPrBuffer + uiResStr );
+        if(strnicmp(pbPrBuffer+uiResStr,"\"\"",2)==0)
+        {
+            // we found a empty resolution string so skip this one
+            bSkipEntry = TRUE;
+        }
       }
 
       /*      */
