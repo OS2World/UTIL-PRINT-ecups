@@ -250,9 +250,9 @@ PTM0235I: Add support to a legacy PostScript driver.
 PTM0236I: Import PostScript Printer Description
 PTM0237I: You cannot import a PPD file unless you have either CUPS or at least one legacy PostScript driver installed.
 PTM0238I: The PPD has been imported.
-PTM0239?:
-PTM0240?:
-PTM0241?:
+PTM0239I: Install Driver?
+PTM0240I: The driver "%1" is now available. Do you want to install this driver?
+PTM0241I: (Saying 'Yes' will allow existing printer objects to use this driver.)
 PTM0242?:
 PTM0243?:
 PTM0244?:

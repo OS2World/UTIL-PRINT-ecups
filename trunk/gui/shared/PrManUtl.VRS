@@ -274,7 +274,7 @@ CopyPrinterPak: PROCEDURE EXPOSE globals.
     /* If AUXPRINT.PAK exists, copy it as well */
     copyfile = drv_dir'\AUXPRINT.PAK'
     IF STREAM( copyfile, 'C', 'QUERY EXISTS') <> '' THEN DO
-        ok = VRCopyFile( copyfile, newdrvdir'\AUXPRINT.PAK'
+        ok = VRCopyFile( copyfile, newdrvdir'\AUXPRINT.PAK')
         CALL LINEOUT globals.!log1, ' -' copyfile ':' ok
     END
 
@@ -759,6 +759,257 @@ QueryAvailableDrivers: PROCEDURE EXPOSE globals. drv_list.
 RETURN drv_list.0
 
 
+/*:VRX         PinWrapper
+*/
+/*  Wrapper for PIN, which performs the following tasks:
+ *  - Create a temporary working directory & copy the PrinterPak files there.
+ *  - Pre-process the PPD file to make it ready for import, and saves it in
+ *    a driver-specific 'saved PPDs' directory for future use.
+ *  - Uses PIN to import the PPD into our temporary working copy of the driver.
+ *  - Copy the updated driver back to our installable copy.
+ *  - If update_all is 1 then also do the following:
+ *      - If the driver is actually installed, copy the updated driver back
+ *        over the installed version as well.
+ *      - If this is a 'shipped' driver (i.e. one listed in PRDRV.LST) then
+ *        add the newly-defined printer to PRDESC.LST.
+ */
+PinWrapper: PROCEDURE EXPOSE globals. driver_path driver_repo
+    ARG update_all, driver, ppdfile
+
+    CALL LINEOUT globals.!log1, 'Driver source:          ' driver_path
+
+    workdir = SysTempFileName( globals.!tmpdir'\PPD_????')
+    ok = VRMkDir( workdir )
+    IF ok == 1 THEN ok = VrMkDir( workdir'\OUT')
+    IF ok <> 1 THEN
+        RETURN 5                        /** RC=5 failed to create directory */
+
+    CALL LINEOUT globals.!log1, 'Temporary directory:    ' workdir
+
+    SELECT
+        WHEN driver == 'ECUPS'    THEN ppddir = globals.!repository'\PPD_E'
+        WHEN driver == 'ECUPS-HP' THEN ppddir = globals.!repository'\PPD_EHP'
+        WHEN driver == 'PSPRINT'  THEN ppddir = globals.!repository'\PPD_PS'
+        WHEN driver == 'PSPRINT2' THEN ppddir = globals.!repository'\PPD_PS2'
+        WHEN driver == 'PSCRIPT2' THEN ppddir = globals.!repository'\PPD2'
+        WHEN driver == 'GUTENPRT' THEN ppddir = globals.!repository'\PPD_GP'
+        OTHERWISE                      ppddir = globals.!repository'\PPD'
+    END
+
+    /* Make sure ppddir (for keeping PPD files) exists */
+    CALL SysFileTree ppddir, 'dirs.', 'DO'
+    IF dirs.0 == 0 THEN DO
+        ok = VRMkDir( ppddir )
+        IF ok <> 1 THEN
+            RETURN 5                    /** RC=5 failed to create directory */
+    END
+
+    CALL LINEOUT globals.!log1, 'Directory for PPD files:' ppddir
+
+    /***
+     *** Now do the actual work.
+     ***/
+
+    /* Copy the needed driver files to our working directories.
+     */
+    drvr_dir = VRParseFileName( driver_path, 'DP')
+    drv_out  = workdir'\OUT\'driver'.DRV'
+    pin_exe  = workdir'\PIN.EXE'
+    ppd_exe  = workdir'\PPDENC.EXE'
+    ok = VRCopyFile( driver_path, drv_out )
+    IF ok == 1 THEN ok = VRCopyFile( drvr_dir'\PIN.EXE', pin_exe )
+    IF ok == 1 THEN ok = VRCopyFile( drvr_dir'\PPDENC.EXE', ppd_exe )
+    IF ok == 0 THEN DO
+        RETURN 4                        /*** RC=4  Failed to copy driver files ***/
+    END
+
+    /* Set up the output redirection.
+     */
+    nq = RXQUEUE('CREATE')
+    oq = RXQUEUE('SET', nq )
+
+    /* If we are importing a new PPD file, prep it first.
+     * (If ppdfile is undefined, it means we are reimporting a directory of
+     * previously-imported PPDs, and we can assume they are already prepped.)
+     */
+    IF ppdfile <> '' THEN DO
+
+        /* If the PPD file is compressed, uncompress it.
+         */
+        IF VRParseFilePath( ppdfile, 'E') == 'GZ' THEN DO
+            decppd = workdir'\' || VRParseFilePath( ppdfile, 'N')
+            CALL LINEOUT globals.!log1, 'Decompressing' ppdfile 'to' decppd
+            ADDRESS CMD '@'globals.!programs.!gzip '-c -d' ppdfile '| RXQUEUE' nq
+            DO QUEUED()
+                PARSE PULL line
+                CALL LINEOUT decppd, line
+            END
+            CALL LINEOUT decppd
+            ppdfile = decppd
+        END
+
+        IF VRFileExists( ppdfile ) == 0 THEN DO
+            CALL LINEOUT globals.!log1, 'PPD file' ppdfile 'could not be found.'
+            RETURN 6                        /** RC=6  PPD import failed **/
+        END
+
+        ppd_use = ppddir'\' || VRParseFileName( ppdfile, 'NE')
+
+        /* Now we have to clean up and validate the PPD file so PIN can use it.
+         * First, PPDENC converts the codepage if necessary, and copies the results
+         * to our working directory.
+         */
+        CALL LINEOUT globals.!log1, 'Converting PPD with:' ppd_exe ppdfile ppd_use
+        ADDRESS CMD '@'ppd_exe ppdfile ppd_use '2>NUL | RXQUEUE' nq
+        DO QUEUED()
+            PULL output
+            CALL LINEOUT globals.!log2, output
+        END
+        CALL LINEOUT globals.!log2, ''
+        CALL LINEOUT globals.!log2
+
+        IF VRFileExists( ppd_use ) == 0 THEN DO
+            CALL LINEOUT globals.!log1, 'Hmm,' ppd_use 'was not created.  Copying manually.'
+            CALL VRCopyFile ppdfile, ppd_use
+        END
+
+        /* Next we strip out some problematic PPD statements which are often
+         * encountered in (for example) CUPS-based PPD files.
+         */
+        CALL CleanPPD ppd_use, globals.!log1
+
+    END
+
+    /* Preparation complete.  Now do the import.
+     */
+    count = 0
+    ADDRESS CMD '@'pin_exe 'ppd' ppddir drv_out '2>NUL | RXQUEUE' nq
+    DO QUEUED()
+        PARSE PULL output
+        CALL LINEOUT globals.!log2, output
+        PARSE VAR output . 'OK (' nickname
+        IF nickname <> '' THEN DO
+            count = count + 1
+            newprinters.count = STRIP( nickname, 'T', ')')
+        END
+    END
+    newprinters.0 = count
+    CALL LINEOUT globals.!log2, ''
+    CALL LINEOUT globals.!log2
+
+    /* End the output redirection.
+     */
+    CALL RXQUEUE 'SET',    oq
+    CALL RXQUEUE 'DELETE', nq
+
+    IF newprinters.0 == 0 THEN DO
+        RETURN 6                        /** RC=6  PPD import failed **/
+    END
+
+    /***
+     *** Post-import processing.
+     ***/
+
+    IF ( driver_repo == 1 ) & ( update_all <> 0 ) THEN DO
+        /* If we're working out of the repository, we need to update the
+         * driver table in PRDESC.LST to add the new driver(s).
+         */
+
+        CALL LINEOUT globals.!log1, 'Updating' globals.!prdesc 'with new entries from' drv_out
+
+/* -- This causes a SYS3175 in the .DRV for some reason...
+        ok = UpdatePrDesc( driver'.DRV', drv_out )
+        IF ok <> 0 THEN
+            CALL LINEOUT globals.!log1, 'Failed to update' globals.!prdesc '(are EAs on' drv_out ' valid?)'
+*/
+
+        count = 0
+
+        /* First, copy all lines that don't refer to the driver just updated */
+        CALL LINEIN globals.!prdesc, 1, 0
+        DO WHILE LINES( globals.!prdesc )
+            _next = LINEIN( globals.!prdesc )
+            PARSE UPPER VAR _next . ':' _rest
+            _tail = SUBSTR( _rest, LASTPOS('(', _rest ))
+            PARSE VAR _tail '('_prdrv')' .
+            IF _prdrv == driver'.DRV' THEN ITERATE
+            count = count + 1
+            defs.count = _next
+        END
+        CALL STREAM globals.!prdesc, 'C', 'CLOSE'
+
+        /* Next, create a new list for the updated driver and merge that in */
+        newlist = workdir'\'driver'.LST'
+        CALL CreateDriverList drv_out, newlist
+        DO WHILE LINES( newlist )
+            _line = LINEIN( newlist )
+            count = count + 1
+            defs.count = _line
+        END
+        CALL STREAM newlist, 'C', 'CLOSE'
+        defs.0 = count
+
+        /* Now sort the list and recreate PRDESC.LST */
+        CALL SysStemSort 'defs.',, 'I'
+        prdesc_tmp = workdir'\PRDESC.LST'
+        IF STREAM( prdesc_tmp, 'C', 'QUERY EXISTS') <> '' THEN
+            CALL VRDeleteFile prdesc_tmp
+        DO i = 1 TO defs.0
+            CALL LINEOUT prdesc_tmp, defs.i
+        END
+        CALL LINEOUT prdesc_tmp
+        ok = VRCopyFile( prdesc_tmp, globals.!prdesc )
+        IF ok == 0 THEN DO
+            RETURN 7                    /** RC=7  Error updating PRDESC.LST **/
+        END
+        CALL VRDeleteFile prdesc_tmp
+
+    END
+
+    /* Finally, copy the updated driver files.
+     */
+    target = VRParseFilePath( driver_path, 'DP')
+    CALL LINEOUT globals.!log1, 'Copying files from' workdir'\OUT to' target
+    CALL PRReplaceModule target'\'driver'.DRV', '', ''
+    ok = VRCopyFile( workdir'\OUT\'driver'.DRV', target'\'driver'.DRV')
+    IF ok == 1 THEN
+        ok = VRCopyFile( workdir'\OUT\AUXPRINT.PAK', target'\AUXPRINT.PAK')
+
+    IF ( ok == 1 ) & ( update_all <> 0 ) THEN DO
+        /* Copy the updated files to \OS2\DLL\<driver>, replacing any
+         * existing copies.  (This prevents problems if the OS/2 driver
+         * installation fails to copy them, which can happen under some
+         * circumstances.)
+         */
+        IF VRFileExists( globals.!os2dir'\DLL\'driver'\'driver'.DRV') THEN DO
+            CALL VRCopyFile workdir'\OUT\AUXPRINT.PAK',,
+                            globals.!os2dir'\DLL\'driver'\AUXPRINT.PAK'
+            CALL PRReplaceModule globals.!os2dir'\DLL\'driver'\'driver'.DRV', '', ''
+            CALL VRCopyFile workdir'\OUT\'driver'.DRV', globals.!os2dir'\DLL\'driver'\'driver'.DRV'
+        END
+    END
+    IF ok == 0 THEN DO
+        CALL LINEOUT globals.!log1, VRError()
+        RETURN 4                        /*** RC=4  Failed to copy driver files ***/
+    END
+
+    CALL LINEOUT globals.!log1, newprinters.0 'printers imported successfully.'
+    DO i = 1 TO newprinters.0
+        CALL LINEOUT globals.!log1, ' ->' newprinters.i
+    END
+    CALL LINEOUT globals.!log1, ''
+    CALL LINEOUT globals.!log1
+
+    /* Clean up our work directories.
+     */
+    CALL VRDeleteFile workdir'\OUT\*'
+    CALL VRDeleteFile workdir'\*'
+    CALL VRRmDir( workdir'\OUT')
+    CALL VRRmDir( workdir )
+
+RETURN 0
+
+
 /*:VRX         UpdatePrDesc
 */
 UpdatePrDesc: PROCEDURE EXPOSE globals.
@@ -780,7 +1031,7 @@ UpdatePrDesc: PROCEDURE EXPOSE globals.
     END
     CALL STREAM globals.!prdesc, 'C', 'CLOSE'
 
-    DO i = 1 TO devs.0
+    DO i = 1 TO newdevs.0
         _count = _count + 1
         prdefs._count = newdevs.i':' newdevs.i '('driver')'
     END
