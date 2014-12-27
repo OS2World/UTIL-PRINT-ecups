@@ -560,6 +560,9 @@ Fini:
     window = VRWindow()
     call VRSet window, "Visible", 0
     drop window
+
+    CALL PrintManCheckIn 'CUPSWIZ DONE'
+
 return 0
 
 /*:VRX         GetCupsPorts
@@ -1135,7 +1138,6 @@ Init:
         IF VRIsDir( InitArgs.i ) THEN
             globals.!cupsdir = InitArgs.1
         ELSE IF InitArgs.i == '/R' THEN DO
-say 'remote'
             globals.!cupsdir = ''
             _force_remote = 1
         END
@@ -1156,6 +1158,8 @@ say 'remote'
      */
     IF VRFileExists( globals.!log2 ) THEN
         CALL VRDeleteFile globals.!log2
+
+    CALL PrintManCheckIn 'CUPSWIZ INIT'
 
     window = VRWindow()
     call VRMethod window, "CenterWindow"
@@ -1625,6 +1629,30 @@ PICT_ICON_Click: PROCEDURE EXPOSE globals.
     CALL VRLoadSecondary 'SW_ABOUT', 'W'
 RETURN
 
+/*:VRX         PrintManCheckIn
+*/
+PrintManCheckIn: PROCEDURE
+    PARSE ARG data
+
+    /* This function attempts to report in to Printer Manager (if it's running)
+     * by using a named pipe.
+     */
+    IF data == '' THEN RETURN 0
+
+    npipe = '\PIPE\PRINTMAN'
+    RC_PIPE_BUSY = '231'
+
+    PARSE UPPER VALUE STREAM( npipe, 'C', 'OPEN WRITE') WITH state ':' rc .
+    IF state <> 'READY' THEN DO
+        IF rc == RC_PIPE_BUSY THEN
+            rc = SysWaitNamedPipe( npipe, 0 )
+        IF rc <> 0 THEN RETURN 0
+    END
+    CALL CHAROUT npipe, data
+    CALL STREAM npipe, 'C', 'CLOSE'
+
+RETURN 0
+
 /*:VRX         PromptForPMName
 */
 PromptForPMName: PROCEDURE EXPOSE globals. models. best
@@ -1900,7 +1928,7 @@ SW_ABOUT_Init:
     CALL NLSSetText 'SW_ABOUT',  'Caption', 10                                          /* 10: Product Information */
     CALL NLSSetText 'DT_ABOUT1', 'Caption', 11                                          /* 11: eCups Printer Install Utility */
     CALL NLSSetText 'DT_ABOUT2', 'Caption', 12, '1.05'                                  /* 12: Version %1 */
-    CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010, 2013'                            /* 13: (C) %1 Alex Taylor */
+    CALL NLSSetText 'DT_ABOUT3', 'Caption', 13, '2010-2014'                             /* 13: (C) %1 Alex Taylor */
     CALL NLSSetText 'PB_ABOUT',  'Caption', 2                                           /* 10: Product Information */
 
     CALL NLSSetText 'DT_BOOTDRIVE',  'Caption', 14, TRANSLATE( globals.!bootdrv )       /* 14: System boot volume: %1 */
