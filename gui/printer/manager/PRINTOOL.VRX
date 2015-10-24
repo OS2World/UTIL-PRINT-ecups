@@ -894,8 +894,8 @@ RETURN
 */
 LoadSettings: PROCEDURE EXPOSE globals.
 
-    globals.!version = '0.50'
-    globals.!copyright = '2013-2014'
+    globals.!version = '0.51'
+    globals.!copyright = '2013-2015'
 
     me = VRGet('Application', 'Program')
     IF me == '' THEN PARSE SOURCE . . me
@@ -1634,7 +1634,7 @@ PB_PPUPDATE_Click: PROCEDURE EXPOSE globals.
                         WHEN ok == 5 THEN CALL LINEOUT globals.!log1, 'Failed to create directory'
                         WHEN ok == 6 THEN CALL LINEOUT globals.!log1, 'PPD import failed'
                         WHEN ok == 7 THEN CALL LINEOUT globals.!log1, 'Error updating PRDESC.LST'
-                        OTHERWISE CALL LINEOUT globals.!log1, 'Unknown error'
+                        OTHERWISE CALL LINEOUT globals.!log1, 'Unknown error ('pwok')'
                     END
                     ok = 0
                 END

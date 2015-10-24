@@ -799,6 +799,7 @@ PinWrapper: PROCEDURE EXPOSE globals. driver_path driver_repo
     /* Make sure ppddir (for keeping PPD files) exists */
     CALL SysFileTree ppddir, 'dirs.', 'DO'
     IF dirs.0 == 0 THEN DO
+        IF ppdfile == '' THEN RETURN 0  /* No PPDs - nothing to do */
         ok = VRMkDir( ppddir )
         IF ok <> 1 THEN
             RETURN 5                    /** RC=5 failed to create directory */
